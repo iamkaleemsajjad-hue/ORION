@@ -1,0 +1,13 @@
+services:
+  orion-api:
+    build: .
+    command: ["orion300m", "serve", "--host", "127.0.0.1", "--port", "8200"]
+    ports:
+      - "127.0.0.1:8200:8200"
+    environment:
+      ORION_300M_WEIGHTS: /models/orion-300m
+    volumes:
+      - ./checkpoints:/models:ro
+    read_only: true
+    security_opt:
+      - no-new-privileges:true

@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+.venv/
+
+# Local model and dataset artifacts
+checkpoints/**
+!checkpoints/.gitkeep
+artifacts/**
+!artifacts/.gitkeep
+datasets/raw/
+datasets/processed/
+datasets/cache/
+*.safetensors
+*.onnx
+*.gguf
+*.bin
+*.memmap
+*.idx
+
+# Local run output and credentials
+logs/
+*.log
+.env
+.env.*
+!.env.example
+.hf_home/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

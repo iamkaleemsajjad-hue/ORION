@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orion-tokenizer"
+version = "0.1.0"
+description = "Versioned byte-level BPE interface and explicit training tools for ORION AI"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+  "orion-core==0.1.0",
+  "tokenizers>=0.20,<1",
+  "pydantic>=2.7,<3",
+]
+
+[project.scripts]
+orion-tokenizer = "orion_tokenizer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

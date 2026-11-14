@@ -1,0 +1,19 @@
+{
+  "verification_method": "Instantiate model modules on the PyTorch meta device and count unique registered parameters.",
+  "verified_on": "2026-11-14",
+  "orion_100m": {
+    "body_parameters": 100291840,
+    "planned_parameters": 100291840,
+    "matches_plan": true
+  },
+  "orion_300m": {
+    "unique_parameters": 306763200,
+    "planned_parameters": 306763200,
+    "embeddings_tied": true,
+    "matches_plan": true
+  },
+  "limitations": [
+    "Parameter counts validate the implemented module shapes only; they do not validate model quality or runtime feasibility.",
+    "The ORION-300M decoder-only choice remains subject to the unrun architecture arbiter in the plan."
+  ]
+}

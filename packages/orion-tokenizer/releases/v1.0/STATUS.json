@@ -1,0 +1,8 @@
+{
+  "status": "pending",
+  "tokenizer_version": "1.0",
+  "vocab_size": 32768,
+  "trained_tokenizer_present": false,
+  "training_corpus_downloaded": false,
+  "reason": "Production corpus authorization and the provisional special-token ID assignments require review before training."
+}

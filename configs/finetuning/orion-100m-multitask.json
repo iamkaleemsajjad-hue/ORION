@@ -1,0 +1,30 @@
+{
+  "trainer": {
+    "max_steps": 1000,
+    "grad_accum_steps": 1,
+    "max_grad_norm": 1.0,
+    "precision": "bf16",
+    "log_every_steps": 10,
+    "checkpoint_every_steps": 100,
+    "checkpoint_dir": "checkpoints/orion-100m-finetune",
+    "seed": 1729,
+    "loss_spike_factor": 5.0,
+    "loss_ema_decay": 0.98,
+    "rollback_on_spike": false,
+    "lower_lr_on_rollback": 0.5
+  },
+  "sequence_length": 512,
+  "batch_size": 8,
+  "learning_rate": 0.00002,
+  "weight_decay": 0.01,
+  "warmup_steps": 50,
+  "scheduler": "wsd",
+  "task_weights": {
+    "subject": 1.0,
+    "document_type": 1.0,
+    "topic": 1.0,
+    "multilabel": 0.5,
+    "metadata": 0.5,
+    "confidence": 0.3
+  }
+}

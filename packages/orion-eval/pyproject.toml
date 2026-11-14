@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orion-eval"
+version = "0.1.0"
+description = "Metrics and sealed evaluation controls for ORION models"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = ["orion-core==0.1.0", "numpy>=1.24,<3"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

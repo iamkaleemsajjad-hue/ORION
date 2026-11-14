@@ -1,0 +1,12 @@
+{
+  "tokenizer_version": "1.0",
+  "algorithm": "byte-level BPE",
+  "vocab_size": 32768,
+  "normalization": "NFC",
+  "byte_alphabet_size": 256,
+  "special_token_count": 256,
+  "learned_merge_count": 32256,
+  "special_token_id_table_reviewed": false,
+  "production_tokenizer_trained": false,
+  "status": "pending"
+}

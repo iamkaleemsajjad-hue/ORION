@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orion-madad-adapter"
+version = "0.1.0"
+description = "Optional payload adapters for connecting ORION SDKs to MADAD-shaped interfaces"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = ["orion-core==0.1.0"]
+
+[project.optional-dependencies]
+models = ["orion-100m==0.1.0", "orion-300m==0.1.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

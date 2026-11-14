@@ -1,0 +1,9 @@
+{
+  "seed": 1729,
+  "confidence_level": 0.95,
+  "bootstrap_resamples": 2000,
+  "calibration_bins": 15,
+  "open_set_target_tpr": 0.95,
+  "require_sealed_test_split": true,
+  "report_metrics": ["accuracy", "macro_f1", "micro_f1", "ece", "brier", "fpr_at_tpr"]
+}

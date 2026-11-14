@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "dataset_id": "synthetic-manifest-example",
+  "created_at": "2026-11-14",
+  "sources": [
+    {
+      "source_id": "synthetic-fixture-only",
+      "kind": "synthetic-metadata-example",
+      "revision": "fixture-v1",
+      "license": {
+        "spdx_id": "CC0-1.0",
+        "attribution": "Synthetic metadata fixture; contains no source documents",
+        "non_commercial": false,
+        "share_alike": false,
+        "verified": false,
+        "source_url": null
+      },
+      "local_path": null,
+      "sha256": null,
+      "synthetic": true
+    }
+  ],
+  "normalization": "NFC",
+  "pipeline_version": "0.1.0",
+  "seed": 1729,
+  "filters": [],
+  "synthetic_fixture": true
+}

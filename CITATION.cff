@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: "If you use the ORION AI software, cite this software record and the relevant model card after a trained model is released."
+title: "ORION AI"
+version: 0.1.0
+date-released: 2026-11-14
+abstract: "Independent Transformer model software for educational document understanding and context-grounded generation. No trained weights are included in this software release."
+license: MIT
+type: software
