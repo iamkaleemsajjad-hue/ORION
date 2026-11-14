@@ -12,6 +12,16 @@ package = false
 [tool.uv.workspace]
 members = ["packages/*"]
 
+[tool.uv.sources]
+orion-core          = { workspace = true }
+orion-tokenizer     = { workspace = true }
+orion-data          = { workspace = true }
+orion-train         = { workspace = true }
+orion-eval          = { workspace = true }
+orion-100m          = { workspace = true }
+orion-300m          = { workspace = true }
+orion-madad-adapter = { workspace = true }
+
 [dependency-groups]
 dev = [
   "pytest>=8.0,<9",

@@ -15,11 +15,11 @@ jobs:
   dependency-audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
       - run: uv sync --all-packages --group dev
       - name: Audit installed Python dependencies
         run: uv run --with pip-audit pip-audit --skip-editable
