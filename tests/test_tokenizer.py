@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 import torch
 from tokenizers import AddedToken, Tokenizer, decoders, models, normalizers, pre_tokenizers
@@ -34,7 +36,7 @@ def test_frozen_special_byte_ids_and_utf8_roundtrip(tokenizer: OrionTokenizer) -
     assert tokenizer.vocab_size == 512
     for token, token_id in SPECIAL_TOKEN_IDS.items():
         assert tokenizer.special_token_id(token) == token_id
-    text = "English, اردو اور mixed text — Δx = 2."
+    text = "English, \u0627\u0631\u062f\u0648 \u0627\u0648\u0631 mixed text \u2014 \u0394x = 2."
     encoded = tokenizer.encode(text)
     assert tokenizer.decode(encoded.input_ids) == text
 
@@ -50,7 +52,7 @@ def test_batch_padding_offsets_and_truncation(tokenizer: OrionTokenizer) -> None
     batch = tokenizer.encode_batch(["alpha", "longer words"], padding="longest")
     assert len(batch.input_ids[0]) == len(batch.input_ids[1])
     assert batch.attention_mask[0].count(0) > 0
-    ids, offsets = tokenizer.encode_with_offsets("Aβ")
+    ids, offsets = tokenizer.encode_with_offsets("A\u03b2")
     assert len(ids) == len(offsets)
     assert max(end for _, end in offsets) == 2
     with pytest.raises(InputLimitError):
@@ -67,10 +69,16 @@ def test_empty_and_invalid_batch_inputs_fail(tokenizer: OrionTokenizer) -> None:
 def test_production_tokenizer_training_requires_reviewed_id_map() -> None:
     with pytest.raises(ValueError, match="explicitly reviewed"):
         TokenizerTrainingConfig().validate()
+    with pytest.raises(ValueError, match="frozen 32,768-token vocabulary"):
+        TokenizerTrainingConfig(vocab_size=512, token_map_approved=True).validate()
+    TokenizerTrainingConfig(
+        vocab_size=512,
+        status="synthetic-test-fixture",
+    ).validate()
 
 
 def test_local_token_and_whole_word_shards_remain_aligned(
-    tokenizer: OrionTokenizer, tmp_path
+    tokenizer: OrionTokenizer, tmp_path: Path
 ) -> None:
     manifest = write_aligned_token_shards(
         ["hello world", "اردو notes", "   "], tokenizer, tmp_path / "shards"
@@ -79,6 +87,7 @@ def test_local_token_and_whole_word_shards_remain_aligned(
     assert manifest["tokenizer_sha256"] == tokenizer.sha256
     token_record = manifest["token_shard"]
     word_record = manifest["word_id_shard"]
+    assert isinstance(token_record, dict) and isinstance(word_record, dict)
     assert token_record["token_count"] == word_record["value_count"]
     dataset = TokenBlockDataset(
         tmp_path / "shards" / "tokens.u16",

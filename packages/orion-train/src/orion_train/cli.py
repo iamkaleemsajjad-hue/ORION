@@ -4,12 +4,12 @@ import argparse
 import json
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="orion-train")
     parser.add_argument("--version", action="version", version="orion-train 0.1.0")
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("info", help="Show training entry points and safety guarantees")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.command == "info":
         print(
             json.dumps(
@@ -22,8 +22,13 @@ def main() -> None:
                     ],
                     "checkpoint_format": [
                         "model.safetensors",
+                        "model.safetensors.sha256",
                         "optimizer.safetensors",
-                        "state.json",
+                        "optimizer.safetensors.sha256",
+                        "rng.safetensors",
+                        "rng.safetensors.sha256",
+                        "training_state.json",
+                        "manifest.json",
                     ],
                 },
                 indent=2,

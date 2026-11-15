@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 import torch
 from torch import nn
@@ -99,7 +100,7 @@ class CrossAttention(nn.Module):
                     dropout_p=dropout_p,
                 )
         attended = attended.transpose(1, 2).contiguous().view(batch, target_length, hidden)
-        return self.output(attended)
+        return cast(torch.Tensor, self.output(attended))
 
 
 class EncoderBlock(nn.Module):
@@ -134,7 +135,7 @@ class EncoderBlock(nn.Module):
             position_ids=position_ids,
         )
         hidden = hidden + attended
-        return hidden + self.feed_forward(self.ffn_norm(hidden))
+        return hidden + cast(torch.Tensor, self.feed_forward(self.ffn_norm(hidden)))
 
 
 class DecoderBlock(nn.Module):
@@ -174,12 +175,15 @@ class DecoderBlock(nn.Module):
             position_ids=position_ids,
         )
         hidden = hidden + attended
-        hidden = hidden + self.cross_attention(
-            self.cross_query_norm(hidden),
-            self.cross_memory_norm(memory),
-            memory_attention_mask=source_attention_mask,
+        hidden = hidden + cast(
+            torch.Tensor,
+            self.cross_attention(
+                self.cross_query_norm(hidden),
+                self.cross_memory_norm(memory),
+                memory_attention_mask=source_attention_mask,
+            ),
         )
-        return hidden + self.feed_forward(self.ffn_norm(hidden))
+        return hidden + cast(torch.Tensor, self.feed_forward(self.ffn_norm(hidden)))
 
 
 class Orion300MEncoderDecoderPilot(nn.Module):
@@ -201,9 +205,9 @@ class Orion300MEncoderDecoderPilot(nn.Module):
         self.token_embeddings = nn.Embedding(
             config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id
         )
-        self.encoder = nn.ModuleList(EncoderBlock(config) for _ in range(encoder_layers))
+        self.encoder = nn.ModuleList([EncoderBlock(config) for _ in range(encoder_layers)])
         self.encoder_norm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
-        self.decoder = nn.ModuleList(DecoderBlock(config) for _ in range(decoder_layers))
+        self.decoder = nn.ModuleList([DecoderBlock(config) for _ in range(decoder_layers)])
         self.decoder_norm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         self.lm_head.weight = self.token_embeddings.weight
@@ -213,10 +217,12 @@ class Orion300MEncoderDecoderPilot(nn.Module):
         """Initialize the pilot from scratch and scale residual projections."""
         depth = self.encoder_layer_count + self.decoder_layer_count
         residual_std = 0.02 / (2 * depth) ** 0.5
-        residual_projections = {layer.attention.o_proj for layer in self.encoder} | {
-            layer.feed_forward.down_proj for layer in self.encoder
+        encoder_layers = cast(list[EncoderBlock], list(self.encoder))
+        decoder_layers = cast(list[DecoderBlock], list(self.decoder))
+        residual_projections = {layer.attention.o_proj for layer in encoder_layers} | {
+            layer.feed_forward.down_proj for layer in encoder_layers
         }
-        for layer in self.decoder:
+        for layer in decoder_layers:
             residual_projections.update(
                 {
                     layer.self_attention.o_proj,

@@ -7,11 +7,13 @@ import os
 import tempfile
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 
 
-def write_jsonl(path: str | Path, records: Iterable[dict]) -> int:
+def write_jsonl(path: str | Path, records: Iterable[dict[str, Any]]) -> int:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     count = 0
@@ -30,7 +32,7 @@ def write_jsonl(path: str | Path, records: Iterable[dict]) -> int:
     return count
 
 
-def read_jsonl(path: str | Path):
+def read_jsonl(path: str | Path) -> Iterable[Any]:
     with Path(path).open("r", encoding="utf-8") as stream:
         for line_number, line in enumerate(stream, 1):
             if line.strip():
@@ -87,7 +89,9 @@ def write_word_id_shard(path: str | Path, word_ids: Iterable[int]) -> dict[str, 
     }
 
 
-def read_token_shard(path: str | Path, *, offset: int = 0, count: int | None = None) -> np.ndarray:
+def read_token_shard(
+    path: str | Path, *, offset: int = 0, count: int | None = None
+) -> NDArray[np.uint16]:
     path = Path(path)
     byte_count = path.stat().st_size
     if byte_count % 2:

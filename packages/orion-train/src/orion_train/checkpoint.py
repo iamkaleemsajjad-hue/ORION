@@ -12,6 +12,7 @@ from typing import Any, cast
 
 import numpy as np
 import torch
+from numpy.typing import NDArray
 from torch import nn
 
 from orion_core.errors import ArtifactIntegrityError, ModelWeightsNotFound
@@ -19,7 +20,7 @@ from orion_core.hashing import sha256_file, verify_sha256
 from orion_core.serialization import load_safetensors, save_safetensors
 
 _CHECKPOINT_SCHEMA_VERSION = "1.2"
-_NumpyRNGState = tuple[str, np.ndarray, int, int, float]
+_NumpyRNGState = tuple[str, NDArray[np.uint32], int, int, float]
 
 
 def _to_jsonable(value: Any) -> Any:
@@ -47,7 +48,7 @@ def _metadata_contains(actual: Any, expected: Any) -> bool:
             key in actual and _metadata_contains(actual[key], value)
             for key, value in expected.items()
         )
-    return actual == expected
+    return bool(actual == expected)
 
 
 def load_checkpoint_model_weights(
@@ -136,6 +137,7 @@ class CheckpointManager:
         data_state: dict[str, Any] | None = None,
         metadata: dict[str, Any] | None = None,
         runtime_state: dict[str, Any] | None = None,
+        distributed_states: list[dict[str, Any]] | None = None,
     ) -> Path:
         """Write an immutable numbered checkpoint and update the verified latest pointer."""
         if step < 0 or epoch < 0:
@@ -172,6 +174,7 @@ class CheckpointManager:
                 "torch_rng_tensor": "torch_rng",
                 "metadata": _to_jsonable(metadata or {}),
                 "runtime_state": _to_jsonable(runtime_state or {}),
+                "distributed_states": _to_jsonable(distributed_states),
             }
             rng_tensors: dict[str, torch.Tensor] = {
                 "torch_rng": torch.get_rng_state(),
@@ -238,6 +241,7 @@ class CheckpointManager:
         checkpoint: str | Path | None = None,
         map_location: str | torch.device = "cpu",
         expected_metadata: dict[str, Any] | None = None,
+        restore_rng: bool = True,
     ) -> dict[str, Any]:
         """Restore all saved state and random generators from a verified checkpoint."""
         if checkpoint is None:
@@ -305,28 +309,29 @@ class CheckpointManager:
         _restore_optimizer(model, optimizer, optimizer_state, state["optimizer_state"])
         if scheduler is not None:
             scheduler.load_state_dict(scheduler_state)
-        rng = load_safetensors(path / "rng.safetensors", device="cpu")
-        torch.set_rng_state(rng["torch_rng"].to(dtype=torch.uint8, device="cpu"))
-        cuda_count = int(state.get("cuda_rng_count", 0))
-        actual_cuda_keys = {key for key in rng if key.startswith("cuda_rng_")}
-        if cuda_count != len(actual_cuda_keys):
-            raise ArtifactIntegrityError("Checkpoint CUDA RNG state is incomplete")
-        if cuda_count and torch.cuda.is_available():
-            cuda_states = [
-                rng[f"cuda_rng_{index}"].to(dtype=torch.uint8, device="cpu")
-                for index in range(cuda_count)
-            ]
-            torch.cuda.set_rng_state_all(cuda_states)
-        random.setstate(_tuplify(state["python_rng_state"]))
-        np.random.set_state(
-            (
-                str(numpy_state["algorithm"]),
-                rng["numpy_rng"].cpu().numpy().astype(np.uint32, copy=False),
-                int(numpy_state["position"]),
-                int(numpy_state["has_gauss"]),
-                float(numpy_state["cached_gaussian"]),
+        if restore_rng:
+            rng = load_safetensors(path / "rng.safetensors", device="cpu")
+            torch.set_rng_state(rng["torch_rng"].to(dtype=torch.uint8, device="cpu"))
+            cuda_count = int(state.get("cuda_rng_count", 0))
+            actual_cuda_keys = {key for key in rng if key.startswith("cuda_rng_")}
+            if cuda_count != len(actual_cuda_keys):
+                raise ArtifactIntegrityError("Checkpoint CUDA RNG state is incomplete")
+            if cuda_count and torch.cuda.is_available():
+                cuda_states = [
+                    rng[f"cuda_rng_{index}"].to(dtype=torch.uint8, device="cpu")
+                    for index in range(cuda_count)
+                ]
+                torch.cuda.set_rng_state_all(cuda_states)
+            random.setstate(_tuplify(state["python_rng_state"]))
+            np.random.set_state(
+                (
+                    str(numpy_state["algorithm"]),
+                    rng["numpy_rng"].cpu().numpy().astype(np.uint32, copy=False),
+                    int(numpy_state["position"]),
+                    int(numpy_state["has_gauss"]),
+                    float(numpy_state["cached_gaussian"]),
+                )
             )
-        )
         return state
 
 

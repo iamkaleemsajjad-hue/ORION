@@ -15,5 +15,8 @@ dependencies = [
   "PyYAML>=6,<7",
 ]
 
+[project.scripts]
+orion = "orion_core.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]

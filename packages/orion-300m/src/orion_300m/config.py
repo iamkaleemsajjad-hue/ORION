@@ -43,7 +43,13 @@ class Orion300MConfig(BaseModel):
         if self.max_generation_tokens > self.context_length:
             raise ValueError("max_generation_tokens cannot exceed context_length")
         if (
-            max(self.pad_token_id, self.bos_token_id, self.eos_token_id, self.abstain_token_id)
+            max(
+                self.pad_token_id,
+                self.bos_token_id,
+                self.eos_token_id,
+                self.abstain_token_id,
+                self.end_token_id,
+            )
             >= self.vocab_size
         ):
             raise ValueError("special token IDs must be below vocab_size")

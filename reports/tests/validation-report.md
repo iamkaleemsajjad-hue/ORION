@@ -1,60 +1,60 @@
 # Software validation report
 
-Validation was run on Windows with Python 3.10.11, CPU synthetic fixtures, and
-the dependencies already available in the workspace. No dataset acquisition,
-tokenizer training, production model training, GPU job, or release upload was
-run. Tiny one-step objective tests are software tests and do not constitute
-ORION training.
+Validation date: 2026-11-14. Environment: Windows, Python 3.10.11,
+PyTorch 2.9.1+cpu. CUDA was unavailable. Tests used synthetic/local fixtures;
+no real dataset, production tokenizer, trained model, GPU job or release upload
+was produced.
 
-## Passing checks
+## Executed checks
 
 | Check | Result |
 |---|---|
-| `python -m pytest -q` | 51 tests passed; one environment warning reports deprecated `pynvml`. |
-| `ruff check .` | Passed. |
-| `ruff format --check .` | Passed after formatting; all checked files were formatted. |
-| `python tools/count_params.py` | Both parameter counts match their targets; tied decoder embeddings are verified. |
-| `python tools/validate_config.py --kind 100m-training configs/pretraining/orion-100m-rtd.json` | Passed. |
-| `python tools/validate_config.py --kind 300m-training configs/pretraining/orion-300m-causal.json` | Passed. |
-| Seven pretraining, fine-tuning, SFT, and architecture-pilot config validators | Passed. |
+| `python -m pytest -q` | 77 passed, 1 skipped, 1 PyTorch `pynvml` deprecation warning; 31.35 s. The skipped test is the two-process Gloo runtime test on this Windows build. |
+| `python -m mypy packages tests tools --show-error-codes` | Passed: no issues in 121 analyzed source files under the pinned strict configuration. |
+| `python -m ruff check .` | Passed. |
+| `python -m ruff format --check .` | Passed; 184 files already formatted. |
 | `python -m compileall -q packages tools tests` | Passed. |
-| All eight package wheel builds and local-target import check | Passed with `pip wheel --no-deps --no-build-isolation` and a clean `--no-index --no-deps --target` install; dependencies came from the existing environment. |
-| Model CLI help/info smoke checks | Passed from source and generated wheel entry points with `PYTHONPATH` set to the local install; `info` reports no trained weights and no imported pretrained weights. |
+| `python tools/count_params.py` | ORION-100M 100,291,840 parameters; ORION-300M 306,763,200 unique parameters with tied embeddings. |
+| `orion preflight` source mode | Imported all eight local package trees and validated all checked-in recipe/schema contracts. Returned `blocked` (exit 1): Tokenizers 0.22.2 is below the >=0.23.3,<0.24 requirement; the tokenizer-owner-approval check is also pending. `training_started` was false. |
+| Tokenizer synthetic train/release tests | Tiny 512-token test fixture trains, verifies staging/cleanup behavior, and is refused by production verify/export. Final tokenizer commands were not run. |
+| Data preparation/verifier tests | Synthetic local JSONL fixtures exercised prepare/verification, hashes, alignment, split checks, policy and traversal rejection. No production manifest/corpus was used. |
+| `git diff --check` | No whitespace errors. Git emitted expected LF-to-CRLF working-copy notices for files under its configured line-ending policy. |
 
-The suite includes forward/backward and parameter-count checks; tokenizer byte,
-Unicode, Urdu, and alignment tests; tiny synthetic RTD, causal, multi-task,
-assistant-only SFT, Matryoshka contrastive, registry-prototype/open-set, and
-three-candidate architecture-pilot optimizer steps; prefix-LM mask and
-encoder-decoder cross-attention tests; checkpoint integrity, RNG, run identity,
-and interrupted-run equivalence checks; held-out-shard evaluation; CPU
-generation/cache/streaming and ordered batch API; API body limits and error
-sanitization; data guards; evaluation metrics; adapter contracts; and static
-package-independence checks. The batch-sampler tests cover contrastive resume
-at an epoch boundary. Checkpoint tests detect JSON-state tampering and reject
-fine-tuning from a mismatched model/config checkpoint.
+The test suite exercises architecture shapes/counts, causal and bidirectional
+masks, GQA/RoPE, gradients, tokenizer Unicode/Urdu and byte fallback, objective
+losses, tiny optimizer/recovery behavior, data processing, API contracts,
+missing weights, package independence and synthetic DDP sampler partitioning.
 
-## Checks that did not pass or were not completed
+## Blocked or not verified
 
-- `python -m mypy packages tests tools` exited with 171 errors across 48 files.
-  The environment has mypy 2.1.0, while `pyproject.toml` requires mypy `<2`, so
-  the configured version was not available. The run also reported missing
-  third-party stubs, including `tokenizers` and `pyarrow`, along with source
-  typing errors. No clean strict type-check result is claimed; strict settings
-  were not weakened to hide the findings.
-- `pip check` reports conflicts among unrelated packages in the pre-existing
-  global Python environment (including protobuf, decorator, httpx, urllib3,
-  NumPy/OpenCV, packaging, cachetools, matplotlib/scikit-learn, and tornado).
-  No global packages were changed to resolve them. A clean isolated install was
-  not performed.
-- `uv.lock` generation and an isolated dependency-resolving install remain
-  incomplete: `uv` was unavailable and the configured package index did not
-  provide it. Wheel builds and no-dependency target imports did pass.
-- GitHub Actions workflows were added but not executed in this workspace.
-- A full dependency vulnerability scan, external security audit, formal privacy
-  review, and legal review were not performed.
-- No release payload was built or uploaded because no trained model artifact is
-  present.
+- The two-process DDP Gloo test is skipped because this Windows PyTorch build
+  cannot create a Gloo network device. Run it on a supported Linux CPU/Gloo
+  runner. CUDA/NCCL and FSDP were not tested; FSDP is not implemented.
+- A direct tiny FSDP construction probe on installed PyTorch 2.9.1+cpu failed
+  with `FSDP needs a non-CPU accelerator device, but no accelerator device is
+  detected.` This confirms local hardware blocks FSDP runtime validation; it is
+  not a failure result for a supported accelerator environment.
+- A one-rank CPU/Gloo probe of the installed `fully_shard` API failed during
+  process-group setup with `makeDeviceForHostname(): unsupported gloo device`.
+  WSL enumeration returned `E_ACCESSDENIED`; no Linux runtime is available on
+  this host for the required Gloo test.
+- `uv` and Tokenizers 0.23.3 were unavailable from the configured package
+  index. No genuine `uv.lock` exists and dependency-resolving clean installation
+  of all eight packages was not completed. `pip check` from the global
+  environment reports conflicts among unrelated pre-installed packages and is
+  not evidence about an isolated ORION environment.
+- The source preflight is implemented. Installed-mode preflight remains
+  unverified until an isolated installation is available.
+- Data preparation is tested on synthetic fixtures only. Corpus-scale memory
+  and throughput, real-data leakage, provenance rights, language-ID quality,
+  and PII false negatives remain unverified or require external review.
+- Security scanners and GitHub workflows were not run. No SBOM or vulnerability
+  report was generated. Formal security, privacy, and legal reviews remain
+  outstanding. Offline behavior was not monitored with network-denial tooling.
+- No trained artifact exists, so learned inference, trained-artifact parity,
+  ONNX/quantization parity, model-quality evaluation, GPU performance, and
+  production-size memory use were not measured.
 
-The command log in this report describes this implementation run; rerun all
-commands under the final, intended package-install environment before a release
-or production training phase.
+The final gate status and next actions are in
+`reports/implementation/training-readiness-checklist.md` and
+`reports/implementation/final_engineering_handover.md`.

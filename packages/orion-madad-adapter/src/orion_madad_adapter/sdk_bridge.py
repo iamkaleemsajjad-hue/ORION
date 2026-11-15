@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from orion_core.schemas import CourseProfile as OrionCourseProfile
 from orion_core.schemas import DocumentPayload
@@ -24,16 +24,31 @@ class Orion100MClassifierAdapter:
     ) -> dict[str, object]:
         fields = fields or {}
         options = options or {}
+        raw_headings = fields.get("headings", [])
+        if not isinstance(raw_headings, list) or any(
+            not isinstance(value, str) for value in raw_headings
+        ):
+            raise ValueError("fields.headings must be a list of strings")
+        raw_confidence = fields.get("ocr_confidence")
+        if raw_confidence is not None and (
+            isinstance(raw_confidence, bool) or not isinstance(raw_confidence, (int, float))
+        ):
+            raise ValueError("fields.ocr_confidence must be a number or null")
+        raw_top_k = options.get("top_k", 3)
+        if type(raw_top_k) is not int or raw_top_k < 1:
+            raise ValueError("options.top_k must be a positive integer")
         document = DocumentPayload(
             filename=str(fields.get("filename") or "") or None,
             file_type=str(fields.get("file_type") or "") or None,
             title=str(fields.get("title") or "") or None,
-            headings=[str(value) for value in fields.get("headings", [])],
+            headings=list(raw_headings),
             text=text,
-            ocr_confidence=fields.get("ocr_confidence"),
+            ocr_confidence=float(raw_confidence) if raw_confidence is not None else None,
             language_hint=str(fields.get("language") or "") or None,
         )
         course_values = (registry or {}).get("courses", [])
+        if not isinstance(course_values, list):
+            raise ValueError("registry.courses must be a list")
         courses = [
             OrionCourseProfile.model_validate(item)
             for item in course_values
@@ -49,10 +64,13 @@ class Orion100MClassifierAdapter:
         result = self.model.classify(
             document,
             registry=courses,
-            top_k=int(options.get("top_k", 3)),
+            top_k=raw_top_k,
             tasks=tasks,
         )
-        return result.model_dump(mode="json")
+        payload = result.model_dump(mode="json")
+        if not isinstance(payload, dict) or any(not isinstance(key, str) for key in payload):
+            raise TypeError("ORION classify result must serialize to a string-keyed object")
+        return cast(dict[str, object], payload)
 
 
 class Orion300MTutorAdapter:

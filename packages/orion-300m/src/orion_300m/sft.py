@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, TypedDict, cast
 
 import torch
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -30,9 +30,32 @@ _ROLE_IDS = {
 }
 
 
+class EncodedText(Protocol):
+    @property
+    def input_ids(self) -> Sequence[int]: ...
+
+
+class Tokenizer(Protocol):
+    def encode(
+        self,
+        text: str,
+        *,
+        add_bos: bool = False,
+        add_eos: bool = False,
+        allow_special_tokens: bool = False,
+        max_length: int | None = None,
+        truncation: str | None = None,
+    ) -> EncodedText: ...
+
+
+class SFTRecord(TypedDict):
+    input_ids: list[int]
+    assistant_mask: list[bool]
+
+
 def render_chat_messages(
-    messages: Sequence[dict[str, str]], tokenizer: Any, *, max_length: int
-) -> dict[str, list[int]]:
+    messages: Sequence[dict[str, str]], tokenizer: Tokenizer, *, max_length: int
+) -> SFTRecord:
     """Render validated chat turns and mark assistant content plus end tokens as targets."""
     if max_length < 4 or not messages:
         raise ValueError("messages must be non-empty and max_length must be at least four")
@@ -66,7 +89,7 @@ def render_chat_messages(
 
 def write_sft_jsonl(
     conversations: Sequence[Sequence[dict[str, str]]],
-    tokenizer: Any,
+    tokenizer: Tokenizer,
     path: str | Path,
     *,
     max_length: int,
@@ -117,7 +140,7 @@ class SFTTrainingConfig(BaseModel):
         return self
 
 
-class SFTJsonlDataset(Dataset[dict[str, Any]]):
+class SFTJsonlDataset(Dataset[SFTRecord]):
     """Validated offset-indexed dataset of input IDs and assistant target masks."""
 
     def __init__(self, path: str | Path, *, config: SFTTrainingConfig) -> None:
@@ -167,14 +190,16 @@ class SFTJsonlDataset(Dataset[dict[str, Any]]):
     def __len__(self) -> int:
         return len(self.offsets)
 
-    def __getitem__(self, index: int) -> dict[str, Any]:
+    def __getitem__(self, index: int) -> SFTRecord:
         with self.path.open("rb") as stream:
             stream.seek(self.offsets[index])
-            return json.loads(stream.readline())
+            record = json.loads(stream.readline())
+        self._validate(record, index + 1)
+        return cast(SFTRecord, record)
 
 
 def collate_sft_records(
-    records: Sequence[dict[str, Any]], *, pad_token_id: int
+    records: Sequence[SFTRecord], *, pad_token_id: int
 ) -> dict[str, torch.Tensor]:
     """Right-pad SFT records and keep padding excluded from both attention and loss."""
     if not records:
@@ -200,7 +225,11 @@ def _make_trainer(
     *,
     initial_checkpoint: str | Path | None,
     device: str,
-) -> tuple[Trainer, DataLoader, SFTJsonlDataset]:
+) -> tuple[
+    Trainer[Orion300MDecoder, dict[str, torch.Tensor]],
+    DataLoader[dict[str, torch.Tensor]],
+    SFTJsonlDataset,
+]:
     dataset = SFTJsonlDataset(path, config=config)
     sampler = StatefulRandomSampler(dataset, seed=config.trainer.seed)
     loader = DataLoader(
@@ -259,7 +288,7 @@ def _make_trainer(
         data_state_restorer=lambda state: sampler.load_state_dict(state["sampler"]),
         checkpoint_metadata=run_identity,
     )
-    return trainer, loader, dataset
+    return trainer, cast(DataLoader[dict[str, torch.Tensor]], loader), dataset
 
 
 def train_sft_jsonl(
@@ -323,12 +352,15 @@ def evaluate_sft_jsonl(
         }
     )
     loss = trainer.evaluate(loader, max_batches=max_batches)
+    manager = trainer.checkpoint_manager
+    if manager is None:
+        raise RuntimeError("evaluation checkpoint manager was not configured")
     return {
         "status": "evaluated",
         "objective": "assistant_only_sft",
         "loss": loss,
         "data_sha256": dataset.sha256,
-        "checkpoint": str(trainer.checkpoint_manager.latest()),
+        "checkpoint": str(manager.latest()),
     }
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import torch
 
@@ -9,7 +10,7 @@ from orion_300m.config import Orion300MConfig
 from orion_train.config import TrainerConfig
 
 
-def _write_pairs(path, values: tuple[tuple[int, int], ...]) -> None:
+def _write_pairs(path: Path, values: tuple[tuple[int, int], ...]) -> None:
     path.write_text(
         "\n".join(
             json.dumps({"source_ids": [5, source], "target_ids": [target, 6]})
@@ -20,7 +21,9 @@ def _write_pairs(path, values: tuple[tuple[int, int], ...]) -> None:
     )
 
 
-def test_e3001_runner_executes_all_candidates_on_tiny_synthetic_splits(tmp_path) -> None:
+def test_e3001_runner_executes_all_candidates_on_tiny_synthetic_splits(
+    tmp_path: Path,
+) -> None:
     training = tmp_path / "train.jsonl"
     validation = tmp_path / "validation.jsonl"
     _write_pairs(training, ((300, 310), (301, 311)))

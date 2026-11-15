@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -18,8 +20,8 @@ class GeGLU(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        gated = F.gelu(self.gate_proj(x), approximate="none") * self.up_proj(x)
-        return self.down_proj(self.dropout(gated))
+        gated = F.gelu(self.gate_proj(x), approximate="none") * cast(torch.Tensor, self.up_proj(x))
+        return cast(torch.Tensor, self.down_proj(self.dropout(gated)))
 
 
 class SwiGLU(nn.Module):
@@ -33,5 +35,5 @@ class SwiGLU(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        gated = F.silu(self.gate_proj(x)) * self.up_proj(x)
-        return self.down_proj(self.dropout(gated))
+        gated = F.silu(self.gate_proj(x)) * cast(torch.Tensor, self.up_proj(x))
+        return cast(torch.Tensor, self.down_proj(self.dropout(gated)))

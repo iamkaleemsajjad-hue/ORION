@@ -1,10 +1,28 @@
 # Repository audit at implementation start
 
+This file records the starting state before source changes. The complete
+baseline inventory is in `final_audit_inventory.md`.
+
 - Workspace: `C:\Users\pc\Desktop\ORION AI`.
-- Starting Git state: not a Git repository; `git status` and `git log` could not identify a prior commit.
-- Existing document: `ORION AI — Technical Implementation Plan.docx` (64,042 bytes).
-- Plan extraction: a temporary `plan-extract.tmp` (about 102,000 characters) was generated to review all sections through 36.3. It was an audit artifact, not pre-existing project work, and is scheduled for removal after this handover.
-- Initial source state: no source files existed under `packages`, `tests`, `tools`, `scripts`, `docs`, `configs`, `datasets`, or `.github`; only empty directories were present.
-- No MADAD source tree, model artifacts, checkpoints, trained tokenizer, or data shards were present in this workspace.
-- Environment observed: Windows PowerShell workspace; Python 3.10.11 command available. `uv` was not installed. An isolated install attempt failed because the configured package index returned no `uv` distribution; the planned `uv.lock` was not fabricated.
-- No dataset acquisition, tokenizer training, model training, Hub upload, or GPU job was performed during the audit.
+- Starting Git state: clean at
+  `1251ac6372519b4159a8d87f756f1d4a9a6cfdd2` on `master`; no unrelated
+  user changes were present.
+- The supplied `ORION AI - Technical Implementation Plan.docx` was present
+  (64,042 bytes). The full document, including tables and sections through
+  36.3, was extracted to a temporary audit artifact and read before source
+  modifications.
+- At baseline the workspace already contained 195 tracked files, eight
+  packages, source code, tests, configuration, documentation and CI. This
+  corrects the stale prior repository-audit statement that claimed there was
+  no Git metadata or source tree.
+- No MADAD application source tree, trained model weights, final tokenizer, or
+  real dataset payload was present.
+- Environment at audit start: Windows, Python 3.10.11, PyTorch 2.9.1+cpu,
+  mypy 2.1.0. CUDA was unavailable.
+- `uv` was not installed; no `uv.lock` was tracked. An installation attempt
+  failed because the configured package index returned no `uv` distribution.
+- No data acquisition, tokenizer training, model training, GPU job, Hub upload,
+  or publication occurred.
+
+The final audit findings and post-audit status are in
+`final_engineering_handover.md`.

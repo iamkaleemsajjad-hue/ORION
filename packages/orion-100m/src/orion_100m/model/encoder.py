@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 import torch
 from torch import nn
@@ -77,7 +78,7 @@ class Orion100MEncoder(nn.Module):
             self.config.hidden_size, eps=self.config.layer_norm_eps
         )
         self.layers = nn.ModuleList(
-            EncoderBlock(self.config, index) for index in range(self.config.num_layers)
+            [EncoderBlock(self.config, index) for index in range(self.config.num_layers)]
         )
         self.final_norm = LayerNormNoBias(self.config.hidden_size, eps=self.config.layer_norm_eps)
         self.reset_parameters()
@@ -85,13 +86,14 @@ class Orion100MEncoder(nn.Module):
     def reset_parameters(self) -> None:
         """Apply the plan's truncated-normal initialization and residual scaling."""
         scale = 0.02 / (2 * self.config.num_layers) ** 0.5
+        layers = cast(list[EncoderBlock], list(self.layers))
         for module in self.modules():
             if isinstance(module, nn.Linear):
                 std = (
                     scale
                     if module
-                    in {layer.attention.o_proj for layer in self.layers}
-                    | {layer.feed_forward.down_proj for layer in self.layers}
+                    in {layer.attention.o_proj for layer in layers}
+                    | {layer.feed_forward.down_proj for layer in layers}
                     else 0.02
                 )
                 if not module.weight.is_meta:

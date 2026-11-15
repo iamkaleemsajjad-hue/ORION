@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 import torch
 
@@ -19,7 +21,9 @@ def test_classification_multilabel_and_span_metrics() -> None:
     result = classification_metrics(["math", "math", "history"], ["math", "science", "history"])
     assert result["count"] == 3
     assert result["accuracy"] == pytest.approx(2 / 3)
-    assert result["confusion"]["math"]["science"] == 1
+    confusion = result["confusion"]
+    assert isinstance(confusion, dict)
+    assert confusion["math"]["science"] == 1
     multilabel = multilabel_metrics(
         [{"algebra", "exam"}, {"lecture"}],
         [{"algebra"}, {"lecture"}],
@@ -32,7 +36,7 @@ def test_classification_multilabel_and_span_metrics() -> None:
     )
 
 
-def test_open_set_metrics_bootstrap_and_sealed_guard(tmp_path) -> None:
+def test_open_set_metrics_bootstrap_and_sealed_guard(tmp_path: Path) -> None:
     labels = [0, 0, 1, 1]
     scores = [0.1, 0.4, 0.35, 0.8]
     assert binary_auroc(labels, scores) == pytest.approx(0.75)

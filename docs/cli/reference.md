@@ -5,6 +5,35 @@ weights. `info` reports architecture status without loading weights; inference
 commands fail clearly when trained artifacts are missing. API servers bind to
 `127.0.0.1` by default.
 
+## Environment preflight
+
+```powershell
+orion preflight
+orion preflight --mode installed
+orion preflight --model 100m --dataset-dir .\datasets\prepared\course-mix --tokenizer-dir .\artifacts\orion-tokenizer-v1 --device cuda --precision bf16
+```
+
+The first command checks the source workspace, installed runtime versions, and
+all checked-in run configurations. `--mode installed` checks the eight
+installed distributions instead. Adding `--model` also verifies local
+prepared data and tokenizer inputs; the command reports owner-approval,
+artifact, precision, and minimum-token blockers explicitly. Exit status is 0
+when ready, 1 when checks are blocked, and 2 when the preflight itself could
+not run. Preflight is read-only and never starts training or downloads data.
+
+## Local dataset preparation
+
+```powershell
+orion-data validate-manifest .\datasets\manifests\approved-local.json --mode commercial-clean
+orion-data prepare .\datasets\manifests\approved-local.json --tokenizer .\artifacts\orion-tokenizer-v1 --output .\datasets\prepared\course-mix --config .\configs\data\orion-data-preparation.json --mode commercial-clean
+orion-data verify-prepared .\datasets\prepared\course-mix
+```
+
+Preparation is local-only and refuses synthetic manifests. The manifest must
+pin local JSONL file checksums and verified licenses; the tokenizer must be a
+complete trained ORION release. No data acquisition or tokenizer/model training
+is performed by `prepare` or `verify-prepared`.
+
 ## ORION-100M
 
 ```powershell
@@ -54,7 +83,9 @@ orion300m evaluate --objective sft --sft-jsonl validation-sft.jsonl --checkpoint
 For SFT, prepare tokenized JSONL with the Python `write_sft_jsonl` helper. It
 renders local chat records and masks loss to assistant content and end markers.
 
-`orion-tokenizer train` and `orion-data acquire` also exist. Tokenizer training
-requires its explicit training flag and reviewed token map; acquisition requires
-explicit opt-in, license-policy selection, and pinned source manifests. Neither
-command was run.
+`orion-tokenizer validate-config`, `train`, `verify`, and `export` are also
+available. Production tokenizer training requires the explicit confirmation
+flags and a reviewed recipe. Verification and export require a real trained
+release; the current pending recipe is not one. `orion-data acquire` requires
+explicit opt-in, license-policy selection, and pinned source manifests. No
+production tokenizer training, acquisition, or export was run.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 import torch
 from torch import nn
@@ -81,7 +82,7 @@ class GeneratorBlock(nn.Module):
     def forward(self, x: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
         attended, _ = self.attention(self.attention_norm(x), attention_mask=attention_mask)
         x = x + attended
-        return x + self.ffn(self.ffn_norm(x))
+        return x + cast(torch.Tensor, self.ffn(self.ffn_norm(x)))
 
 
 class SmallMLMGenerator(nn.Module):
@@ -138,7 +139,8 @@ class RTDDiscriminatorHead(nn.Module):
         self.output = nn.Linear(hidden_size, 1, bias=False)
 
     def forward(self, hidden: torch.Tensor) -> torch.Tensor:
-        return self.output(self.norm(F.gelu(self.dense(hidden)))).squeeze(-1)
+        gelu_output = F.gelu(self.dense(hidden))
+        return cast(torch.Tensor, self.output(self.norm(gelu_output))).squeeze(-1)
 
 
 @dataclass(frozen=True)
@@ -206,7 +208,10 @@ class Orion100MRTDPretrainer(nn.Module):
         generator_loss = masked_language_model_loss(generator_logits, mlm_targets)
         sample_logits = generator_logits.detach().float()
         sample_logits[..., :256] = -torch.inf
-        sampled = torch.distributions.Categorical(logits=sample_logits).sample()
+        probabilities = torch.softmax(sample_logits, dim=-1)
+        sampled = torch.multinomial(
+            probabilities.reshape(-1, probabilities.shape[-1]), num_samples=1
+        ).view_as(input_ids)
         selected = mlm_targets.ne(-100)
         corrupted = input_ids.clone()
         corrupted[selected] = sampled[selected]

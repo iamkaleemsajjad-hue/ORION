@@ -191,5 +191,5 @@ def multi_task_loss(
         )
     if not losses:
         raise ValueError("at least one task target is required")
-    total = sum(coefficients[name] * value for name, value in losses.items())
+    total = torch.stack([coefficients[name] * value for name, value in losses.items()]).sum()
     return total, losses

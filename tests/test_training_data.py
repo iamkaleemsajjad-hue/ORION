@@ -4,10 +4,12 @@ import json
 import random
 import shutil
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pytest
 import torch
+from torch.utils.data import DataLoader, Dataset
 
 from orion_core.errors import ArtifactIntegrityError
 from orion_data.acquire import acquire_manifest_sources
@@ -17,18 +19,31 @@ from orion_data.normalize import mask_pii, normalize_text
 from orion_data.pipeline import detect_language_hint, exact_dedup_key
 from orion_data.shards import read_token_shard, write_token_shard
 from orion_train.checkpoint import CheckpointManager
+from orion_train.cli import main as train_cli_main
 from orion_train.config import TrainerConfig
 from orion_train.sampler import StatefulRandomBatchSampler, StatefulRandomSampler
 from orion_train.trainer import Trainer
 
 
 def _linear_regression_loss(
-    network: torch.nn.Module, batch: dict[str, torch.Tensor]
+    network: torch.nn.Linear, batch: dict[str, torch.Tensor]
 ) -> torch.Tensor:
-    return (network(batch["x"]) - batch["y"]).square().mean()
+    prediction = cast(torch.Tensor, network(batch["x"]))
+    return (prediction - batch["y"]).square().mean()
 
 
-def test_local_token_shard_and_memmap_blocks(tmp_path) -> None:
+class _DictBatchDataset(Dataset[dict[str, torch.Tensor]]):
+    def __init__(self, rows: list[dict[str, torch.Tensor]]) -> None:
+        self.rows = rows
+
+    def __len__(self) -> int:
+        return len(self.rows)
+
+    def __getitem__(self, index: int) -> dict[str, torch.Tensor]:
+        return self.rows[index]
+
+
+def test_local_token_shard_and_memmap_blocks(tmp_path: Path) -> None:
     path = tmp_path / "fixture.tokens"
     record = write_token_shard(path, range(24))
     dataset = TokenBlockDataset(path, sequence_length=6, expected_sha256=None)
@@ -50,7 +65,9 @@ def test_resume_sampler_restores_same_remaining_order() -> None:
     assert consumed + list(restored) == consumed + expected
 
 
-def test_resumable_batch_sampler_and_trainer_advance_after_boundary_checkpoint(tmp_path) -> None:
+def test_resumable_batch_sampler_and_trainer_advance_after_boundary_checkpoint(
+    tmp_path: Path,
+) -> None:
     sampler = StatefulRandomBatchSampler(list(range(5)), batch_size=2, seed=27)
     iterator = iter(sampler)
     first_batch = next(iterator)
@@ -65,13 +82,16 @@ def test_resumable_batch_sampler_and_trainer_advance_after_boundary_checkpoint(t
         {"x": torch.tensor([1.0, -1.0]), "y": torch.tensor([0.25])},
         {"x": torch.tensor([-0.5, 2.0]), "y": torch.tensor([-0.1])},
     ]
+    batch_dataset = _DictBatchDataset(dataset)
     train_sampler = StatefulRandomBatchSampler(dataset, batch_size=2, seed=7)
-    loader = torch.utils.data.DataLoader(dataset, batch_sampler=train_sampler)
+    loader: DataLoader[dict[str, torch.Tensor]] = DataLoader(
+        batch_dataset, batch_sampler=train_sampler
+    )
     manager = CheckpointManager(tmp_path / "boundary-checkpoint")
     config = TrainerConfig(max_steps=2, checkpoint_every_steps=1, log_every_steps=1)
     model = torch.nn.Linear(2, 1)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.05)
-    trainer = Trainer(
+    trainer: Trainer[torch.nn.Linear, dict[str, torch.Tensor]] = Trainer(
         model,
         optimizer,
         config=config,
@@ -88,8 +108,10 @@ def test_resumable_batch_sampler_and_trainer_advance_after_boundary_checkpoint(t
     resumed_model = torch.nn.Linear(2, 1)
     resumed_optimizer = torch.optim.SGD(resumed_model.parameters(), lr=0.05)
     resumed_sampler = StatefulRandomBatchSampler(dataset, batch_size=2, seed=7)
-    resumed_loader = torch.utils.data.DataLoader(dataset, batch_sampler=resumed_sampler)
-    resumed = Trainer(
+    resumed_loader: DataLoader[dict[str, torch.Tensor]] = DataLoader(
+        batch_dataset, batch_sampler=resumed_sampler
+    )
+    resumed: Trainer[torch.nn.Linear, dict[str, torch.Tensor]] = Trainer(
         resumed_model,
         resumed_optimizer,
         config=config,
@@ -107,7 +129,7 @@ def test_resumable_batch_sampler_and_trainer_advance_after_boundary_checkpoint(t
     assert resumed.state.epoch == 1
 
 
-def test_safe_checkpoint_restores_parameters_optimizer_and_rng(tmp_path) -> None:
+def test_safe_checkpoint_restores_parameters_optimizer_and_rng(tmp_path: Path) -> None:
     torch.manual_seed(17)
     random.seed(31)
     np.random.seed(47)
@@ -148,13 +170,13 @@ def test_safe_checkpoint_restores_parameters_optimizer_and_rng(tmp_path) -> None
     assert np.random.random() == next_numpy
 
 
-def test_trainer_executes_tiny_real_updates_and_checkpoint_resume(tmp_path) -> None:
+def test_trainer_executes_tiny_real_updates_and_checkpoint_resume(tmp_path: Path) -> None:
     torch.manual_seed(4)
     model = torch.nn.Linear(2, 1)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
     manager = CheckpointManager(tmp_path / "trainer-checkpoints")
     config = TrainerConfig(max_steps=2, checkpoint_every_steps=1, log_every_steps=1)
-    trainer = Trainer(
+    trainer: Trainer[torch.nn.Linear, dict[str, torch.Tensor]] = Trainer(
         model,
         optimizer,
         config=config,
@@ -170,7 +192,7 @@ def test_trainer_executes_tiny_real_updates_and_checkpoint_resume(tmp_path) -> N
 
     second_model = torch.nn.Linear(2, 1)
     second_optimizer = torch.optim.SGD(second_model.parameters(), lr=0.1)
-    second_trainer = Trainer(
+    second_trainer: Trainer[torch.nn.Linear, dict[str, torch.Tensor]] = Trainer(
         second_model,
         second_optimizer,
         config=config,
@@ -184,7 +206,9 @@ def test_trainer_executes_tiny_real_updates_and_checkpoint_resume(tmp_path) -> N
         torch.testing.assert_close(value, expected[name])
 
 
-def test_interrupted_training_resumes_with_equivalent_parameters_and_rng(tmp_path) -> None:
+def test_interrupted_training_resumes_with_equivalent_parameters_and_rng(
+    tmp_path: Path,
+) -> None:
     torch.manual_seed(404)
     random.seed(505)
     np.random.seed(606)
@@ -196,8 +220,9 @@ def test_interrupted_training_resumes_with_equivalent_parameters_and_rng(tmp_pat
     }
     batches = [{"x": torch.tensor([[1.0, -0.5], [0.25, 2.0]]), "y": torch.tensor([[0.2], [-0.1]])}]
 
-    def loss_function(network, batch):
-        return (network(batch["x"]) - batch["y"]).square().mean()
+    def loss_function(network: torch.nn.Module, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+        prediction = cast(torch.Tensor, network(batch["x"]))
+        return (prediction - batch["y"]).square().mean()
 
     uninterrupted_manager = CheckpointManager(tmp_path / "uninterrupted")
     interrupted_model = torch.nn.Sequential(
@@ -205,7 +230,7 @@ def test_interrupted_training_resumes_with_equivalent_parameters_and_rng(tmp_pat
     )
     interrupted_model.load_state_dict(initial_state)
     interrupted_optimizer = torch.optim.AdamW(interrupted_model.parameters(), lr=0.01)
-    interrupted_trainer = Trainer(
+    interrupted_trainer: Trainer[torch.nn.Sequential, dict[str, torch.Tensor]] = Trainer(
         interrupted_model,
         interrupted_optimizer,
         config=TrainerConfig(max_steps=4, checkpoint_every_steps=1, log_every_steps=4),
@@ -245,7 +270,7 @@ def test_interrupted_training_resumes_with_equivalent_parameters_and_rng(tmp_pat
         torch.nn.Linear(2, 4), torch.nn.Dropout(p=0.25), torch.nn.Linear(4, 1)
     )
     resumed_optimizer = torch.optim.AdamW(resumed_model.parameters(), lr=0.01)
-    resumed_trainer = Trainer(
+    resumed_trainer: Trainer[torch.nn.Sequential, dict[str, torch.Tensor]] = Trainer(
         resumed_model,
         resumed_optimizer,
         config=TrainerConfig(max_steps=4, checkpoint_every_steps=1, log_every_steps=4),
@@ -264,7 +289,9 @@ def test_interrupted_training_resumes_with_equivalent_parameters_and_rng(tmp_pat
     assert np.random.random() == expected_rng[2]
 
 
-def test_model_specific_trainers_run_one_synthetic_step_without_release_claims(tmp_path) -> None:
+def test_model_specific_trainers_run_one_synthetic_step_without_release_claims(
+    tmp_path: Path,
+) -> None:
     from orion_100m.config import Orion100MConfig
     from orion_100m.training import RTDTrainingConfig, evaluate_rtd, train_rtd
     from orion_300m.config import Orion300MConfig
@@ -360,11 +387,11 @@ def test_text_normalization_pii_language_and_hashing() -> None:
     assert normalize_text("a\u200cb\x00") == "a\u200cb"
     masked, counts = mask_pii("contact person@example.org")
     assert "person@example.org" not in masked and counts["email"] == 1
-    assert detect_language_hint("اردو language") == "mixed-en-ur"
-    assert exact_dedup_key("café") == exact_dedup_key("cafe\u0301")
+    assert detect_language_hint("\u0627\u0631\u062f\u0648 language") == "mixed-en-ur"
+    assert exact_dedup_key("caf\u00e9") == exact_dedup_key("cafe\u0301")
 
 
-def test_checkpoint_pointer_rejects_path_traversal(tmp_path) -> None:
+def test_checkpoint_pointer_rejects_path_traversal(tmp_path: Path) -> None:
     manager = CheckpointManager(tmp_path / "checkpoints")
     (manager.directory / "latest.json").write_text('{"checkpoint":"../secret"}', encoding="utf-8")
     from orion_core.errors import ArtifactIntegrityError
@@ -373,7 +400,7 @@ def test_checkpoint_pointer_rejects_path_traversal(tmp_path) -> None:
         manager.latest()
 
 
-def test_checkpoint_identity_mismatch_fails_before_model_mutation(tmp_path) -> None:
+def test_checkpoint_identity_mismatch_fails_before_model_mutation(tmp_path: Path) -> None:
     model = torch.nn.Linear(2, 1)
     optimizer = torch.optim.AdamW(model.parameters())
     manager = CheckpointManager(tmp_path / "checkpoints")
@@ -396,7 +423,7 @@ def test_checkpoint_identity_mismatch_fails_before_model_mutation(tmp_path) -> N
         torch.testing.assert_close(value, before[key])
 
 
-def test_checkpoint_verification_tool_accepts_complete_checkpoint(tmp_path) -> None:
+def test_checkpoint_verification_tool_accepts_complete_checkpoint(tmp_path: Path) -> None:
     from tools.verify_checkpoint import verify
 
     model = torch.nn.Linear(2, 1)
@@ -414,7 +441,27 @@ def test_checkpoint_verification_tool_accepts_complete_checkpoint(tmp_path) -> N
     assert result["epoch"] == 1
 
 
-def test_checkpoint_manifest_detects_training_state_tampering(tmp_path) -> None:
+def test_training_cli_reports_the_actual_checkpoint_layout(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    model = torch.nn.Linear(2, 1)
+    manager = CheckpointManager(tmp_path / "checkpoints")
+    checkpoint = manager.save(
+        model=model,
+        optimizer=torch.optim.SGD(model.parameters(), lr=0.1),
+        scheduler=None,
+        step=1,
+    )
+
+    train_cli_main(["info"])
+    response = json.loads(capsys.readouterr().out)
+
+    assert sorted(response["checkpoint_format"]) == sorted(
+        path.name for path in checkpoint.iterdir()
+    )
+
+
+def test_checkpoint_manifest_detects_training_state_tampering(tmp_path: Path) -> None:
     model = torch.nn.Linear(2, 1)
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.01)
     manager = CheckpointManager(tmp_path / "checkpoints")
@@ -437,7 +484,7 @@ def test_checkpoint_manifest_detects_training_state_tampering(tmp_path) -> None:
         )
 
 
-def test_acquisition_is_opt_in_and_rejects_unsafe_repository_ids(tmp_path) -> None:
+def test_acquisition_is_opt_in_and_rejects_unsafe_repository_ids(tmp_path: Path) -> None:
     synthetic = DatasetManifest.load(
         Path(__file__).resolve().parents[1] / "datasets" / "manifests" / "synthetic-example.json"
     )
@@ -451,7 +498,9 @@ def test_acquisition_is_opt_in_and_rejects_unsafe_repository_ids(tmp_path) -> No
                 source_id="../../outside",
                 kind="huggingface-dataset",
                 revision="a" * 40,
-                license=LicenseRecord(spdx_id="MIT", verified=True),
+                license=LicenseRecord(
+                    spdx_id="MIT", attribution="Synthetic test record", verified=True
+                ),
             ),
         ),
     )

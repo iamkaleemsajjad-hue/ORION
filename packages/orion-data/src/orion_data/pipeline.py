@@ -38,7 +38,12 @@ def normalize_text(text: str, *, fold_urdu_variants: bool = False) -> str:
             cleaned.append(char)
     text = "".join(cleaned).replace("\r\n", "\n").replace("\r", "\n")
     if fold_urdu_variants:
-        text = text.translate(str.maketrans({"ك": "ک", "ي": "ی", "ى": "ی"}))
+        translations: dict[str, str | int | None] = {
+            "ك": "ک",
+            "ي": "ی",
+            "ى": "ی",
+        }
+        text = text.translate(str.maketrans(translations))
     return text
 
 
@@ -124,12 +129,13 @@ def synthesize_ocr_noise(text: str, *, cer: float, seed: int) -> str:
 
 
 def process_record(
-    record: dict, *, fold_urdu_variants: bool = False, mask_personal_data: bool = True
-) -> tuple[dict, dict]:
-    if not isinstance(record.get("text"), str):
+    record: dict[str, object], *, fold_urdu_variants: bool = False, mask_personal_data: bool = True
+) -> tuple[dict[str, object], dict[str, object]]:
+    record_text = record.get("text")
+    if not isinstance(record_text, str):
         raise ValueError("record.text must be a string")
-    text = normalize_text(record["text"], fold_urdu_variants=fold_urdu_variants)
-    pii_counts = {}
+    text = normalize_text(record_text, fold_urdu_variants=fold_urdu_variants)
+    pii_counts: dict[str, int] = {}
     if mask_personal_data:
         text, pii_counts = mask_pii(text)
     result = dict(record)
@@ -152,12 +158,17 @@ def detect_language_hint(text: str) -> str:
     return "ur" if arabic else "en" if latin else "other"
 
 
-def deduplicate_records(records: Iterable[dict]) -> tuple[list[dict], int]:
+def deduplicate_records(
+    records: Iterable[dict[str, object]],
+) -> tuple[list[dict[str, object]], int]:
     seen: set[str] = set()
     output = []
     duplicates = 0
     for record in records:
-        key = exact_dedup_key(record["text"])
+        text = record.get("text")
+        if not isinstance(text, str):
+            raise ValueError("record.text must be a string")
+        key = exact_dedup_key(text)
         if key in seen:
             duplicates += 1
             continue

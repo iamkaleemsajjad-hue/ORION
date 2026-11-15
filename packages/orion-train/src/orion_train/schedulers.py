@@ -56,7 +56,7 @@ def build_lr_scheduler(
     kind: str,
     total_steps: int,
     warmup_steps: int,
-    **schedule_kwargs,
+    **schedule_kwargs: float,
 ) -> torch.optim.lr_scheduler.LambdaLR:
     if kind not in {"trapezoidal", "wsd"}:
         raise ValueError("kind must be 'trapezoidal' or 'wsd'")

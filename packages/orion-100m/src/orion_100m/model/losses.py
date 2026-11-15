@@ -91,7 +91,7 @@ def matryoshka_info_nce(
         )
         for dimension, weight in zip(dimensions, coefficients, strict=True)
     ]
-    return sum(losses) / sum(coefficients)
+    return torch.stack(losses).sum() / sum(coefficients)
 
 
 def course_open_set_loss(

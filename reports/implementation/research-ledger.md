@@ -1,34 +1,10 @@
-# ORION AI research ledger
+# Research ledger
 
-Checked on 2026-11-14. Sources below are primary documentation or original
-research papers. A checked source supports the API or finding stated in its row;
-it does not validate the plan's performance estimates or guarantee ORION quality.
+The canonical research ledger is maintained at
+docs/research/research-ledger.md. It records the primary source, date checked,
+technical finding, ORION implementation consequence, and remaining uncertainty
+for current APIs and research choices.
 
-| Topic | Technical decision | Primary source inspected | Finding and implementation consequence | Remaining uncertainty |
-|---|---|---|---|---|
-| PyTorch SDPA | Use `torch.nn.functional.scaled_dot_product_attention`; let PyTorch choose a supported kernel and keep an explicit reference mask path. | [PyTorch SDPA API](https://docs.pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html), checked 2026-11-14 | SDPA has fused backends with input restrictions and may differ slightly numerically by backend; tests must compare tolerances and must not require FlashAttention on every device. | Exact throughput and backend selection vary by PyTorch build and hardware. |
-| PyTorch checkpoint security | Never load model artifacts with pickle. Keep model and optimizer tensors in safetensors and control state in JSON. | [PyTorch `torch.load`](https://docs.pytorch.org/docs/stable/generated/torch.load.html), [PyTorch serialization notes](https://docs.pytorch.org/docs/stable/notes/serialization.html), checked 2026-11-14 | PyTorch warns against loading untrusted pickle; `weights_only=True` narrows but does not remove all risk. This resolves the conflict between plan §25's `training_state.pt` and §30's safetensors-only requirement. | JSON RNG state is larger than a binary training-state file; exact resume remains dependent on deterministic kernels and loader worker behavior. |
-| Hugging Face Tokenizers BPE | Train a local-only byte-level BPE with an explicit initial byte alphabet and frozen control-token IDs. | [Tokenizers trainer API](https://huggingface.co/docs/tokenizers/python/latest/api/reference.html), checked 2026-11-14 | BPE trainer accepts a vocabulary size, special token list, and initial alphabet. The implementation validates reserved IDs and full vocab size after training rather than trusting trainer defaults. | Tokenizer artifact determinism still needs a repeated synthetic-corpus test with the pinned backend version; a production corpus is not available. |
-| Safetensors | Use the safetensors PyTorch API for model and optimizer tensors; verify SHA-256 before reading. | [Safetensors documentation](https://huggingface.co/docs/safetensors/index), checked 2026-11-14 | Safetensors exposes tensor-only save/load functions. Model runtime will not accept `.pt`, `.bin`, or pickle files. | Signatures and SBOM are release-pipeline work; no release keys or weights exist. |
-| Hugging Face Hub acquisition | Any dataset acquisition helper must require an explicit network flag and commit-pinned revision. | [Hub download guide](https://huggingface.co/docs/huggingface_hub/guides/download), checked 2026-11-14 | Snapshot downloads can be selected by revision and can operate in local-only mode. The helper is opt-in and was not invoked. | Dataset cards and licenses need to be checked per source at acquisition time; none were downloaded. |
-| FastAPI security | Keep REST optional, bind to loopback, and use an explicit optional bearer/API-key dependency rather than accepting file paths. | [FastAPI security reference](https://fastapi.tiangolo.com/reference/security/), checked 2026-11-14 | FastAPI provides security dependency primitives. The API is a thin local wrapper with request models and byte/document limits. | Production deployment authentication, TLS, and reverse-proxy configuration depend on the host environment. |
-| ONNX and ONNX Runtime | Treat export and quantization as optional artifacts gated by parity and quality measurements. | [ONNX introduction](https://onnx.ai/onnx/intro/), [ONNX Runtime quantization](https://onnxruntime.ai/docs/how-to/quantization.html), checked 2026-11-14 | ONNX is an interchange graph format; ONNX Runtime exposes separate quantization tooling. The repository provides export/validation code but does not claim speed or quality gains. | Dynamic shapes, KV-cache export, and exact parity need trained artifacts and target hardware. |
-| ELECTRA / RTD | Implement generator MLM plus discriminator replaced-token detection and keep discriminator gradients off the shared token embeddings, as specified by the plan. | [ELECTRA](https://arxiv.org/abs/2003.10555), [DeBERTaV3](https://arxiv.org/abs/2111.09543), checked 2026-11-14 | RTD gives a binary target over original and sampled tokens; DeBERTaV3 discusses embedding-gradient conflict and gradient-disentangled sharing. This supports implementing the objective, not assuming it wins at ORION scale. | The plan's simpler stop-gradient rule is a specified engineering choice; E-100-1 must decide whether it beats MLM at pilot scale. |
-| RoPE | Apply rotary position encoding to query/key vectors without learned position tables. | [RoFormer](https://arxiv.org/abs/2104.09864), checked 2026-11-14 | The paper describes relative-position dependence from rotating query/key vectors. Context extension still needs an empirical experiment. | Theta choices and 2K/4K extension quality are not known for ORION. |
-| Grouped-query attention | Use 15 query heads and 5 KV heads in ORION-300M and enable the documented SDPA GQA path. | [GQA](https://arxiv.org/abs/2305.13245), [PyTorch SDPA API](https://docs.pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html), checked 2026-11-14 | GQA uses an intermediate number of key/value heads; PyTorch SDPA exposes `enable_gqa`. Query-head count must be divisible by KV-head count. | Backend/device support and decode speed require runtime measurement. |
-| AdamW | Use decoupled weight decay, with no decay for norms, biases, and embedding parameters. | [Decoupled Weight Decay Regularization](https://arxiv.org/abs/1711.05101), checked 2026-11-14 | The paper distinguishes decoupled decay from L2 regularization for adaptive optimizers. Parameter grouping is explicit and inspectable. | Betas, learning rates, and decay values remain plan defaults pending pilot sweeps. |
-| Confidence calibration | Fit temperature scaling on a separate calibration split and report ECE/Brier metrics. | [On Calibration of Modern Neural Networks](https://arxiv.org/abs/1706.04599), checked 2026-11-14 | Temperature scaling is a post-hoc calibration approach; reported confidence must be measured, never assumed. | Calibration quality depends on representative labeled calibration data. |
-| Open-set detection | Combine registry cosine similarity with a tuned threshold and optionally energy scores/outlier exposure. | [Energy-based OOD Detection](https://arxiv.org/abs/2010.03759), [Outlier Exposure](https://arxiv.org/abs/1812.04606), checked 2026-11-14 | Energy scores and exposure examples are candidate OOD signals. Thresholds must be set on a dev-unseen split and evaluated once on held-out courses. | Thresholds, unseen-course coverage, and false-placement rates require ORION-Doc-Unseen. |
-
-## Plan assumptions retained
-
-- The 100M and 300M dimensions, vocabulary size, context lengths, losses, and
-  training schedules are implementation defaults from the supplied plan, not
-  experimentally confirmed choices.
-- Throughput, VRAM, cloud cost, and calendar estimates remain assumptions. This
-  software work did not run any GPU benchmark or model training.
-- D8 (external-model synthetic data policy), D10 (Urdu priority), dataset
-  permissions, ORION-Doc authorizations, and legal review remain owner decisions.
-- Phase gates G1–G4, tokenizer experiments T-1/T-2, architecture arbitration,
-  and all quality targets remain unrun.
-
+The final audit updated the ledger for DDP/FSDP recovery and the Tokenizers
+0.23.3 typing-stub dependency. These sources support implementation decisions;
+they do not validate ORION performance or learned quality.

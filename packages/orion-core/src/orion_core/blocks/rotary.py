@@ -14,6 +14,8 @@ def _rotate_half(x: torch.Tensor) -> torch.Tensor:
 class RotaryEmbedding(nn.Module):
     """Generate rotary cosine and sine tables for explicit position indices."""
 
+    inv_freq: torch.Tensor
+
     def __init__(self, head_dim: int, theta: float = 10000.0) -> None:
         super().__init__()
         if head_dim <= 0 or head_dim % 2:

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+
 TOKENIZER_VERSION = "1.0"
 VOCAB_SIZE = 32768
 BYTE_TOKEN_START = 256
@@ -63,6 +66,14 @@ DECODER_FORBIDDEN_TOKEN_IDS = frozenset(
         *(f"<|cite_{index}|>" for index in range(1, 17)),
     }
 )
+
+
+def special_token_map_sha256() -> str:
+    """Return the canonical digest recorded for owner review of the v1 map."""
+    mapping = {str(index): SPECIAL_TOKENS[index] for index in range(256)}
+    encoded = json.dumps(mapping, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
 
 if len(SPECIAL_TOKEN_IDS) != 256 or set(SPECIAL_TOKEN_IDS.values()) != set(range(256)):
     raise RuntimeError("ORION special-token table must cover IDs 0 through 255 exactly once")

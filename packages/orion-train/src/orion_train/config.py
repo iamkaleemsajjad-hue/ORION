@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
@@ -18,6 +20,9 @@ class TrainerConfig(BaseModel):
     checkpoint_every_steps: int = Field(default=1000, gt=0)
     checkpoint_dir: str | None = None
     seed: int = 1729
+    distributed_strategy: Literal["none", "ddp"] = "none"
+    distributed_backend: Literal["auto", "gloo", "nccl"] = "auto"
+    distributed_timeout_seconds: int = Field(default=1800, gt=0)
     loss_spike_factor: float = Field(default=5.0, gt=1)
     loss_ema_decay: float = Field(default=0.98, ge=0, lt=1)
     rollback_on_spike: bool = False

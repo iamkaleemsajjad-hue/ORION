@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 import torch
 from torch import nn
@@ -87,7 +88,7 @@ class Orion300MDecoder(nn.Module):
             padding_idx=self.config.pad_token_id,
         )
         self.layers = nn.ModuleList(
-            DecoderBlock(self.config) for _ in range(self.config.num_layers)
+            [DecoderBlock(self.config) for _ in range(self.config.num_layers)]
         )
         self.final_norm = RMSNorm(self.config.hidden_size, eps=self.config.rms_norm_eps)
         self.lm_head = nn.Linear(self.config.hidden_size, self.config.vocab_size, bias=False)
@@ -97,8 +98,9 @@ class Orion300MDecoder(nn.Module):
     def reset_parameters(self) -> None:
         """Use truncated-normal initialization and scale residual output projections."""
         residual_std = 0.02 / (2 * self.config.num_layers) ** 0.5
-        residual_projections = {layer.attention.o_proj for layer in self.layers} | {
-            layer.feed_forward.down_proj for layer in self.layers
+        layers = cast(list[DecoderBlock], list(self.layers))
+        residual_projections = {layer.attention.o_proj for layer in layers} | {
+            layer.feed_forward.down_proj for layer in layers
         }
         for module in self.modules():
             if isinstance(module, nn.Linear):

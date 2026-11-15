@@ -7,15 +7,16 @@ import os
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import torch
+import torch.distributed as dist
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from torch.utils.data import DataLoader, Dataset
 
 from orion_300m.config import Orion300MConfig
-from orion_300m.model.decoder import Orion300MDecoder
-from orion_300m.model.encoder_decoder import Orion300MEncoderDecoderPilot
+from orion_300m.model.decoder import DecoderOutput, Orion300MDecoder
+from orion_300m.model.encoder_decoder import EncoderDecoderOutput, Orion300MEncoderDecoderPilot
 from orion_core.hashing import sha256_file
 from orion_train.checkpoint import CheckpointManager
 from orion_train.config import TrainerConfig
@@ -144,7 +145,9 @@ class PairedTextDataset(Dataset[dict[str, list[int]]]):
     def __getitem__(self, index: int) -> dict[str, list[int]]:
         with self.path.open("rb") as stream:
             stream.seek(self.offsets[index])
-            return json.loads(stream.readline())
+            record = json.loads(stream.readline())
+        self._validate(record, index + 1)
+        return cast(dict[str, list[int]], record)
 
 
 def _collate_pairs(
@@ -215,25 +218,33 @@ def _loss_for_candidate(
     if candidate == "encoder_decoder":
         if not isinstance(network, Orion300MEncoderDecoderPilot):
             raise TypeError("encoder-decoder candidate received the wrong model")
-        output = network(
-            batch["source_ids"],
-            batch["decoder_input_ids"],
-            source_attention_mask=batch["source_attention_mask"],
-            target_attention_mask=batch["target_attention_mask"],
-            labels=batch["target_labels"],
+        encoder_decoder_output = cast(
+            EncoderDecoderOutput,
+            network(
+                batch["source_ids"],
+                batch["decoder_input_ids"],
+                source_attention_mask=batch["source_attention_mask"],
+                target_attention_mask=batch["target_attention_mask"],
+                labels=batch["target_labels"],
+            ),
         )
+        loss = encoder_decoder_output.loss
     else:
         if not isinstance(network, Orion300MDecoder):
             raise TypeError("decoder candidate received the wrong model")
-        output = network(
-            batch["input_ids"],
-            attention_mask=batch["attention_mask"],
-            labels=batch["labels"],
-            prefix_lengths=batch["prefix_lengths"] if candidate == "prefix_lm" else None,
+        decoder_output = cast(
+            DecoderOutput,
+            network(
+                batch["input_ids"],
+                attention_mask=batch["attention_mask"],
+                labels=batch["labels"],
+                prefix_lengths=batch["prefix_lengths"] if candidate == "prefix_lm" else None,
+            ),
         )
-    if output.loss is None:
+        loss = decoder_output.loss
+    if loss is None:
         raise RuntimeError("architecture pilot model did not compute a loss")
-    return output.loss
+    return loss
 
 
 def _write_json_atomic(path: Path, value: dict[str, Any]) -> None:
@@ -381,7 +392,10 @@ def run_architecture_pilot(
             "they are not production quality or hardware-scale results."
         ),
     }
-    _write_json_atomic(report_path, report)
+    if not dist.is_initialized() or dist.get_rank() == 0:
+        _write_json_atomic(report_path, report)
+    if dist.is_initialized():
+        dist.barrier()
     return report
 
 

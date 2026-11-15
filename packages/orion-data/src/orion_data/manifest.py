@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from orion_data.licenses import LICENSES, assert_license_allowed
 
 
 class LicenseRecord(BaseModel):
@@ -87,10 +90,17 @@ class DatasetManifest(BaseModel):
             raise ValueError("A synthetic fixture manifest cannot contain a non-synthetic source")
         return manifest
 
-    def validate_license_policy(self, mode: str) -> None:
-        """Enforce the documented research or commercial-clean source policy."""
+    def validate_license_policy(
+        self,
+        mode: str,
+        *,
+        purpose: Literal["training", "evaluation", "acquisition"] = "acquisition",
+    ) -> None:
+        """Enforce the source policy for training, evaluation, or acquisition."""
         if mode not in {"research", "commercial-clean"}:
             raise ValueError("mode must be 'research' or 'commercial-clean'")
+        if purpose not in {"training", "evaluation", "acquisition"}:
+            raise ValueError("purpose must be training, evaluation, or acquisition")
         if self.synthetic_fixture:
             return
         for source in self.sources:
@@ -101,9 +111,39 @@ class DatasetManifest(BaseModel):
                 "license not specified",
             }:
                 raise ValueError(f"Unverified license for source {source.source_id}")
+            canonical_spdx = next(
+                (
+                    spdx_id
+                    for spdx_id in LICENSES
+                    if spdx_id.casefold() == license_record.spdx_id.casefold()
+                ),
+                None,
+            )
+            if (
+                canonical_spdx is not None
+                and LICENSES[canonical_spdx].attribution_required
+                and not license_record.attribution.strip()
+            ):
+                raise ValueError(
+                    f"Source {source.source_id} requires an attribution record for {canonical_spdx}"
+                )
+            if (
+                canonical_spdx is not None
+                and LICENSES[canonical_spdx].evaluation_only
+                and purpose == "training"
+            ):
+                raise ValueError(f"Source {source.source_id} is restricted to evaluation use")
             if mode == "commercial-clean":
-                allowed = {"odc-by-1.0", "mit", "apache-2.0", "bsd-2-clause", "bsd-3-clause"}
-                if license_record.non_commercial or license_record.spdx_id.lower() not in allowed:
+                if license_record.non_commercial or license_record.share_alike:
                     raise ValueError(
                         f"Source {source.source_id} is not permitted in commercial-clean mode"
                     )
+                if canonical_spdx is None:
+                    raise ValueError(
+                        f"License {license_record.spdx_id!r} is absent from the reviewed allowlist"
+                    )
+                assert_license_allowed(
+                    canonical_spdx,
+                    mode,
+                    purpose="evaluation" if purpose == "evaluation" else "training",
+                )
