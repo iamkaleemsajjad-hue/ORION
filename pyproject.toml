@@ -29,6 +29,9 @@ dev = [
   "ruff>=0.6,<1",
   "mypy==2.1.0",
   "types-PyYAML>=6.0,<7",
+  # required by test_sdk_api.py which exercises the FastAPI HTTP layer
+  "fastapi>=0.110,<1",
+  "httpx>=0.27,<1",
 ]
 
 [tool.pytest.ini_options]
