@@ -19,17 +19,19 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     with torch.device("meta"):
         if args.model == "orion-100m":
-            config = Orion100MConfig()
-            model = Orion100MEncoder(config)
-            params = model.parameter_count()
+            encoder_config = Orion100MConfig()
+            encoder = Orion100MEncoder(encoder_config)
+            params = encoder.parameter_count()
+            config_json = encoder_config.model_dump(mode="json")
         else:
-            config = Orion300MConfig()
-            model = Orion300MDecoder(config)
-            params = sum(parameter.numel() for parameter in model.parameters())
+            decoder_config = Orion300MConfig()
+            decoder = Orion300MDecoder(decoder_config)
+            params = sum(parameter.numel() for parameter in decoder.parameters())
+            config_json = decoder_config.model_dump(mode="json")
     print(
         json.dumps(
             {
-                "config": config.model_dump(mode="json"),
+                "config": config_json,
                 "parameters": params,
                 "weights_allocated": False,
             },

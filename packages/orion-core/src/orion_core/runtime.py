@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import random
-from contextlib import nullcontext
+from contextlib import AbstractContextManager, nullcontext
 
 import numpy as np
 import torch
@@ -34,7 +34,9 @@ def precision_dtype(name: str, device: torch.device | str) -> torch.dtype:
     raise ValueError("precision must be one of: fp32, bf16, fp16")
 
 
-def autocast_context(device: torch.device | str, dtype: torch.dtype):
+def autocast_context(
+    device: torch.device | str, dtype: torch.dtype
+) -> AbstractContextManager[None]:
     device = torch.device(device)
     if dtype == torch.float32:
         return nullcontext()

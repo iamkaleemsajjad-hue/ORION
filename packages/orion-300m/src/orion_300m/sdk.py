@@ -97,10 +97,10 @@ class Orion300M:
         device: str = "auto",
     ) -> Orion300M:
         """Load a locally installed, hash-verified trained model release."""
-        root = Path(
-            model_dir
-            or os.environ.get("ORION_300M_HOME", Path.home() / ".cache/orion-ai/orion-300m")
-        )
+        configured_dir = model_dir if model_dir is not None else os.environ.get("ORION_300M_HOME")
+        if configured_dir is None:
+            configured_dir = Path.home() / ".cache/orion-ai/orion-300m"
+        root = Path(configured_dir)
         if not root.is_dir():
             raise ModelWeightsNotFound(f"No local ORION-300M release is installed at {root}")
         artifact_path = root / "artifact.json"

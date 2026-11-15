@@ -24,7 +24,7 @@ def to_classifier_inputs(
 ) -> tuple[str, dict[str, object], dict[str, object]]:
     request.validate()
     document = request.document
-    fields = {
+    fields: dict[str, object] = {
         "filename": document.filename,
         "file_type": document.file_type,
         "title": document.title,
@@ -33,7 +33,7 @@ def to_classifier_inputs(
         "language": document.language_hint,
     }
     text = "\n".join([*document.headings, *document.excerpts])
-    registry = {"courses": [asdict(course) for course in request.courses]}
+    registry: dict[str, object] = {"courses": [asdict(course) for course in request.courses]}
     return text, fields, registry
 
 

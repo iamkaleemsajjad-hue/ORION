@@ -55,7 +55,7 @@ class CitationResult:
     warnings: tuple[str, ...]
     unsupported_sentences: tuple[str, ...]
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         return {
             "text": self.text,
             "citations": [asdict(item) for item in self.citations],

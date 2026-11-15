@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Iterator
 from typing import Any, Literal
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.middleware.base import RequestResponseEndpoint
+from starlette.responses import Response
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from orion_300m.sdk import Orion300M
 from orion_core.errors import OrionError
@@ -69,15 +73,15 @@ class BatchGenerationResponse(BaseModel):
 class RequestBodySizeLimit:
     """ASGI receive wrapper that bounds both declared and chunked request bodies."""
 
-    def __init__(self, app, *, max_bytes: int) -> None:
+    def __init__(self, app: ASGIApp, *, max_bytes: int) -> None:
         self.app = app
         self.max_bytes = max_bytes
 
-    async def __call__(self, scope, receive, send):
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope.get("type") != "http":
             await self.app(scope, receive, send)
             return
-        queued = []
+        queued: list[Message] = []
         total = 0
         while True:
             message = await receive()
@@ -109,7 +113,7 @@ class RequestBodySizeLimit:
                     break
         index = 0
 
-        async def replay_receive():
+        async def replay_receive() -> Message:
             nonlocal index
             if index < len(queued):
                 message = queued[index]
@@ -132,7 +136,7 @@ def create_app(sdk: Orion300M | None = None) -> FastAPI:
         return loaded
 
     @app.middleware("http")
-    async def optional_api_key(request: Request, call_next):
+    async def optional_api_key(request: Request, call_next: RequestResponseEndpoint) -> Response:
         expected = os.environ.get("ORION_API_TOKEN")
         if (
             expected
@@ -153,7 +157,7 @@ def create_app(sdk: Orion300M | None = None) -> FastAPI:
         return await call_next(request)
 
     @app.exception_handler(OrionError)
-    async def orion_error_handler(_request: Request, exc: OrionError):
+    async def orion_error_handler(_request: Request, exc: OrionError) -> JSONResponse:
         status = (
             404
             if exc.code == "ORION-E2001"
@@ -174,7 +178,9 @@ def create_app(sdk: Orion300M | None = None) -> FastAPI:
         )
 
     @app.exception_handler(RequestValidationError)
-    async def validation_error_handler(_request: Request, exc: RequestValidationError):
+    async def validation_error_handler(
+        _request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
         errors = [
             {
                 "location": list(error.get("loc", ())),
@@ -286,7 +292,7 @@ def create_app(sdk: Orion300M | None = None) -> FastAPI:
         }
 
     @app.post("/v1/generate/stream")
-    def generate_stream(payload: GenerateRequest):
+    def generate_stream(payload: GenerateRequest) -> StreamingResponse:
         if not payload.documents and payload.task != "generate":
             events = iter(
                 (
@@ -325,7 +331,7 @@ def create_app(sdk: Orion300M | None = None) -> FastAPI:
                 request_id=payload.request_id,
             )
 
-        def encode_events():
+        def encode_events() -> Iterator[str]:
             for item in events:
                 yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
 

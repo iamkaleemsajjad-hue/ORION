@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 import torch
 from fastapi.testclient import TestClient
@@ -14,7 +16,7 @@ from orion_core.errors import ArtifactIntegrityError, ModelWeightsNotFound
 from tests.test_tokenizer import synthetic_tokenizer
 
 
-def test_missing_trained_weights_are_honest(tmp_path) -> None:
+def test_missing_trained_weights_are_honest(tmp_path: Path) -> None:
     with pytest.raises(ModelWeightsNotFound):
         Orion100M.load(weights_dir=tmp_path)
     with pytest.raises(ModelWeightsNotFound):
@@ -186,7 +188,7 @@ def test_batch_generation_preserves_order_and_api_no_context_abstains() -> None:
     ]
 
 
-def test_api_caps_body_and_does_not_echo_invalid_input(monkeypatch) -> None:
+def test_api_caps_body_and_does_not_echo_invalid_input(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("ORION_API_TOKEN", raising=False)
     client = TestClient(create_100m_app())
     oversized = client.post("/v1/classify", content=b"x" * 2_500_001)

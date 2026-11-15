@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -18,7 +20,7 @@ class SequenceClassificationHead(nn.Module):
         self.classifier = nn.Linear(input_size, num_labels)
 
     def forward(self, pooled: torch.Tensor) -> torch.Tensor:
-        return self.classifier(self.dropout(pooled))
+        return cast(torch.Tensor, self.classifier(self.dropout(pooled)))
 
 
 class MultiLabelHead(nn.Module):
@@ -31,7 +33,7 @@ class MultiLabelHead(nn.Module):
         self.classifier = nn.Linear(input_size, num_labels)
 
     def forward(self, pooled: torch.Tensor) -> torch.Tensor:
-        return self.classifier(pooled)
+        return cast(torch.Tensor, self.classifier(pooled))
 
 
 class BIOExtractionHead(nn.Module):
@@ -44,7 +46,7 @@ class BIOExtractionHead(nn.Module):
         self.classifier = nn.Linear(hidden_size, num_tags)
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        return self.classifier(hidden_states)
+        return cast(torch.Tensor, self.classifier(hidden_states))
 
 
 class ConfidenceHead(nn.Module):
@@ -55,7 +57,7 @@ class ConfidenceHead(nn.Module):
         self.classifier = nn.Linear(input_size, 1)
 
     def forward(self, pooled: torch.Tensor) -> torch.Tensor:
-        return self.classifier(pooled).squeeze(-1)
+        return cast(torch.Tensor, self.classifier(pooled)).squeeze(-1)
 
 
 class OpenSetMatcher(nn.Module):

@@ -6,6 +6,7 @@ import json
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -75,7 +76,7 @@ def write_memmap_shard(sequences: list[PackedSequence], output_dir: str | Path) 
     rows, width = len(sequences), len(sequences[0].input_ids)
     if any(len(item.input_ids) != width for item in sequences):
         raise ValueError("all packed sequences must have equal lengths")
-    arrays = {
+    arrays: dict[str, np.memmap[Any, np.dtype[Any]]] = {
         "input_ids": np.memmap(
             root / "input_ids.u16", dtype=np.uint16, mode="w+", shape=(rows, width)
         ),
@@ -115,8 +116,8 @@ def write_memmap_shard(sequences: list[PackedSequence], output_dir: str | Path) 
 def write_parquet_records(records: Iterable[dict[str, object]], path: str | Path) -> Path:
     """Write columnar Parquet when the optional pyarrow extra is installed."""
     try:
-        import pyarrow as pa
-        import pyarrow.parquet as pq
+        import pyarrow as pa  # type: ignore[import-untyped]  # Optional Arrow wheel omits stubs.
+        import pyarrow.parquet as pq  # type: ignore[import-untyped]  # See pyarrow import above.
     except ImportError as exc:
         raise RuntimeError("Parquet output requires `pip install orion-data[parquet]`") from exc
     destination = Path(path)

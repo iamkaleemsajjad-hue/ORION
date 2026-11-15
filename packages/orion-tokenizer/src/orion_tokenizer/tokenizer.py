@@ -7,6 +7,7 @@ import re
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from tokenizers import Tokenizer
 
@@ -65,12 +66,23 @@ class OrionTokenizer:
     """A loaded, hash-checked tokenizer. Runtime loading never trains or downloads."""
 
     def __init__(self, tokenizer: Tokenizer, *, path: Path, manifest: dict[str, object]) -> None:
+        version = manifest.get("tokenizer_version")
+        vocab_size = manifest.get("vocab_size")
+        digest = manifest.get("tokenizer_sha256")
+        if (
+            not isinstance(version, str)
+            or type(vocab_size) is not int
+            or not isinstance(digest, str)
+        ):
+            raise TokenizerMismatchError(
+                "Tokenizer manifest has invalid version, vocabulary, or hash"
+            )
         self._tokenizer = tokenizer
         self.path = path
         self.manifest = manifest
-        self.version = str(manifest["tokenizer_version"])
-        self.vocab_size = int(manifest["vocab_size"])
-        self.sha256 = str(manifest["tokenizer_sha256"])
+        self.version = version
+        self.vocab_size = vocab_size
+        self.sha256 = digest
         self._byte_ids = self._build_byte_ids()
 
     @classmethod
@@ -93,6 +105,8 @@ class OrionTokenizer:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             raise TokenizerMismatchError(f"Invalid tokenizer manifest at {manifest_path}") from exc
+        if not isinstance(manifest, dict):
+            raise TokenizerMismatchError("Tokenizer manifest must be a JSON object")
         if manifest.get("status") != "trained":
             raise TokenizerMismatchError("Tokenizer manifest does not identify a trained artifact")
         if manifest.get("tokenizer_version") != expected_version:
@@ -136,7 +150,7 @@ class OrionTokenizer:
         instance.path = Path("<synthetic-test-fixture>")
         instance.manifest = manifest
         instance.version = TOKENIZER_VERSION
-        instance.vocab_size = int(manifest["vocab_size"])
+        instance.vocab_size = tokenizer.get_vocab_size(with_added_tokens=True)
         instance.sha256 = tokenizer_sha256
         instance._byte_ids = instance._build_byte_ids()
         return instance
@@ -146,7 +160,7 @@ class OrionTokenizer:
         ids = tuple(self._tokenizer.token_to_id(mapping[byte]) for byte in range(256))
         if any(token_id is None for token_id in ids):
             raise TokenizerMismatchError("Tokenizer is missing one or more byte-alphabet tokens")
-        return tuple(int(token_id) for token_id in ids)
+        return tuple(token_id for token_id in ids if token_id is not None)
 
     def encode(
         self,
@@ -363,7 +377,7 @@ class OrionTokenizer:
         skip_special_tokens: bool = False,
     ) -> str:
         """Decode token IDs, optionally removing active and reserved control tokens."""
-        return self._tokenizer.decode(list(ids), skip_special_tokens=skip_special_tokens)
+        return cast(str, self._tokenizer.decode(list(ids), skip_special_tokens=skip_special_tokens))
 
     def special_token_id(self, token: str) -> int:
         """Return a frozen special-token ID or report an unknown token spelling."""

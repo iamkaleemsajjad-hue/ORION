@@ -6,7 +6,10 @@
   "byte_alphabet_size": 256,
   "special_token_count": 256,
   "learned_merge_count": 32256,
+  "special_token_map_sha256": "733da01709c59745290542da2bed85df615873777d35167c61c35bb01f544190",
   "special_token_id_table_reviewed": false,
   "production_tokenizer_trained": false,
-  "status": "pending"
+  "status": "pending",
+  "min_frequency": 2,
+  "seed": 1729
 }

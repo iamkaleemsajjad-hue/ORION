@@ -14,6 +14,7 @@ dependencies = ["orion-core==0.1.0", "numpy>=1.24,<3", "pydantic>=2.7,<3", "PyYA
 parquet = ["pyarrow>=15,<25"]
 hub = ["huggingface-hub>=0.25,<2"]
 dedupe = ["datasketch>=1.6,<2"]
+prepare = ["orion-tokenizer==0.1.0"]
 
 [project.scripts]
 orion-data = "orion_data.cli:main"

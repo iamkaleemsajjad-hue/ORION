@@ -10,7 +10,7 @@ requires-python = ">=3.10"
 license = "MIT"
 dependencies = [
   "orion-core==0.1.0",
-  "tokenizers>=0.20,<1",
+  "tokenizers>=0.23.3,<0.24",
   "pydantic>=2.7,<3",
 ]
 

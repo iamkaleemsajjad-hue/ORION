@@ -27,7 +27,7 @@ dev = [
   "pytest>=8.0,<10",
   "pytest-cov>=5,<8",
   "ruff>=0.6,<1",
-  "mypy>=1.11,<3",
+  "mypy==2.1.0",
   "types-PyYAML>=6.0,<7",
 ]
 
@@ -65,6 +65,12 @@ warn_unused_ignores = true
 namespace_packages = true
 mypy_path = "packages/orion-core/src:packages/orion-tokenizer/src:packages/orion-data/src:packages/orion-train/src:packages/orion-eval/src:packages/orion-100m/src:packages/orion-300m/src:packages/orion-madad-adapter/src"
 exclude = ["build", "dist"]
+
+# Tokenizers 0.23.3+ ships first-party stubs; this narrow fallback supports older
+# developer environments where the Rust extension wheel has no typing marker.
+[[tool.mypy.overrides]]
+module = ["tokenizers", "tokenizers.*"]
+ignore_missing_imports = true
 
 [tool.coverage.run]
 branch = true

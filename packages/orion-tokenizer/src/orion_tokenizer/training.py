@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
+import os
+import shutil
+import tempfile
 import unicodedata
 from collections.abc import Iterable, Iterator
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Literal
 
 import tokenizers
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from tokenizers import (
     AddedToken,
+    Regex,
     Tokenizer,
     decoders,
     models,
@@ -28,6 +33,7 @@ from orion_tokenizer.spec import (
     SPECIAL_TOKENS,
     TOKENIZER_VERSION,
     VOCAB_SIZE,
+    special_token_map_sha256,
 )
 from orion_tokenizer.tokenizer import _bytes_to_unicode
 
@@ -47,6 +53,7 @@ class TokenizerTrainingConfig:
     seed: int = 1729
     status: str = "trained"
     token_map_approved: bool = False
+    approved_token_map_sha256: str | None = None
 
     def validate(self) -> None:
         if self.vocab_size < 512 or self.vocab_size > VOCAB_SIZE:
@@ -57,11 +64,69 @@ class TokenizerTrainingConfig:
             raise ValueError("min_frequency must be positive")
         if self.status not in {"trained", "synthetic-test-fixture"}:
             raise ValueError("status must be trained or synthetic-test-fixture")
+        if self.status == "trained" and self.vocab_size != VOCAB_SIZE:
+            raise ValueError("a production tokenizer must use the frozen 32,768-token vocabulary")
         if self.status == "trained" and not self.token_map_approved:
             raise ValueError(
                 "the provisional special-token map must be explicitly reviewed before "
                 "a production tokenizer can be marked trained"
             )
+        if (
+            self.status == "trained"
+            and self.approved_token_map_sha256 != special_token_map_sha256()
+        ):
+            raise ValueError("production tokenizer config must match the reviewed token-map digest")
+
+
+class TokenizerReleaseConfig(BaseModel):
+    """Checked-in tokenizer recipe whose release-state fields remain pending."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    tokenizer_version: Literal["1.0"] = "1.0"
+    algorithm: Literal["byte-level BPE"] = "byte-level BPE"
+    vocab_size: Literal[32768] = 32768
+    normalization: Literal["NFC"] = "NFC"
+    byte_alphabet_size: Literal[256] = 256
+    special_token_count: Literal[256] = 256
+    learned_merge_count: Literal[32256] = 32256
+    special_token_map_sha256: str = Field(
+        default_factory=special_token_map_sha256,
+        pattern=r"^[0-9a-f]{64}$",
+    )
+    special_token_id_table_reviewed: bool = False
+    production_tokenizer_trained: Literal[False] = False
+    status: Literal["pending"] = "pending"
+    min_frequency: int = Field(default=2, ge=1)
+    seed: int = 1729
+
+    @model_validator(mode="after")
+    def validate_vocabulary_allocation(self) -> TokenizerReleaseConfig:
+        if self.vocab_size != (
+            self.byte_alphabet_size + self.special_token_count + self.learned_merge_count
+        ):
+            raise ValueError("vocabulary size must equal specials + byte alphabet + learned merges")
+        if self.special_token_map_sha256 != special_token_map_sha256():
+            raise ValueError(
+                "recipe token-map digest does not match the current special-token registry"
+            )
+        return self
+
+    def training_config(self, *, approve_token_map: bool) -> TokenizerTrainingConfig:
+        """Create a production config only after both review assertions."""
+        if not self.special_token_id_table_reviewed or not approve_token_map:
+            raise ValueError(
+                "complete owner review and pass --approve-token-map before production training"
+            )
+        return TokenizerTrainingConfig(
+            vocab_size=self.vocab_size,
+            tokenizer_version=self.tokenizer_version,
+            min_frequency=self.min_frequency,
+            seed=self.seed,
+            status="trained",
+            token_map_approved=True,
+            approved_token_map_sha256=self.special_token_map_sha256,
+        )
 
 
 def iter_local_text(paths: Iterable[str | Path], *, field: str = "text") -> Iterator[str]:
@@ -96,7 +161,7 @@ def iter_local_text(paths: Iterable[str | Path], *, field: str = "text") -> Iter
 def _make_backend() -> Tokenizer:
     backend = Tokenizer(models.BPE(unk_token="<|unk|>"))
     backend.normalizer = normalizers.NFC()
-    regex_split = pre_tokenizers.Split(pre_tokenizers.Regex(_PATTERN), behavior="isolated")
+    regex_split = pre_tokenizers.Split(Regex(_PATTERN), behavior="isolated")
     byte_level = pre_tokenizers.ByteLevel(add_prefix_space=False, use_regex=False)
     backend.pre_tokenizer = pre_tokenizers.Sequence([regex_split, byte_level])
     backend.decoder = decoders.ByteLevel()
@@ -115,6 +180,44 @@ def train_tokenizer(
     This function never downloads data. Production release training should only be invoked
     after the corpus/license manifest and provisional token-ID decisions are approved.
     """
+    training_config = config or TokenizerTrainingConfig()
+    training_config.validate()
+    destination = Path(output_dir).absolute()
+    if destination.is_symlink() or (destination.exists() and not destination.is_dir()):
+        raise ValueError("Tokenizer output must be a regular directory path")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists() and any(destination.iterdir()):
+        raise FileExistsError(
+            f"Refusing to overwrite non-empty tokenizer release directory {destination}"
+        )
+    staging = Path(tempfile.mkdtemp(prefix=f".{destination.name}.", dir=destination.parent))
+    try:
+        _train_tokenizer_in_directory(
+            paths,
+            staging,
+            config=training_config,
+            jsonl_text_field=jsonl_text_field,
+        )
+        if training_config.status == "trained":
+            from orion_tokenizer.release import verify_tokenizer_release
+
+            verify_tokenizer_release(staging)
+        if destination.exists():
+            destination.rmdir()
+        os.replace(staging, destination)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    return destination
+
+
+def _train_tokenizer_in_directory(
+    paths: Iterable[str | Path],
+    output_dir: str | Path,
+    *,
+    config: TokenizerTrainingConfig | None,
+    jsonl_text_field: str,
+) -> Path:
     training_config = config or TokenizerTrainingConfig()
     training_config.validate()
     corpus_files = sorted(
@@ -173,9 +276,7 @@ def train_tokenizer(
     backend.save(str(tokenizer_path), pretty=True)
     tokenizer_digest = sha256_file(tokenizer_path)
     special_map = {str(index): SPECIAL_TOKENS[index] for index in range(len(SPECIAL_TOKENS))}
-    special_digest = hashlib.sha256(
-        json.dumps(special_map, sort_keys=True, ensure_ascii=False).encode("utf-8")
-    ).hexdigest()
+    special_digest = special_token_map_sha256()
     manifest: dict[str, object] = {
         "status": training_config.status,
         "tokenizer_version": training_config.tokenizer_version,

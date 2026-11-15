@@ -1,46 +1,48 @@
-# Implementation status
+# ORION implementation status
 
-This status describes software behavior in this repository. No production
-tokenizer or trained ORION weights exist. The plan's quality, speed, memory,
-and capability targets are not results.
+Status date: 2026-11-14. This report covers software only. No production
+tokenizer, real dataset, or trained ORION weights exist.
 
-## Implemented and verified in this phase
+## Verified locally
 
-| Area | Status | Evidence |
+| Area | Evidence | Status |
 |---|---|---|
-| Package boundaries and shared core | Implemented and tested | CPU unit tests cover configs, runtime helpers, serialization, core blocks, and import independence. |
-| ORION-100M model body | Implemented and tested | Encoder forward/backward, attention masking and padding behavior pass; body count is 100,291,840 parameters. |
-| ORION-300M model body | Implemented and tested | Decoder forward/backward, causal masking, tied weights, KV-cache equivalence pass; count is 306,763,200 unique parameters. |
-| Tokenizer software | Implemented and partially verified | Byte-level BPE interface, local trainer, encoding, decoding, offsets, batching, and integrity checks have synthetic tests. The reserved-ID table is provisional and the final tokenizer has not been trained. |
-| Data and shard tools | Implemented and partially verified | Local manifests, license gates, normalizers, filtering, deduplication, packing, acquisition safeguards, token shards, and aligned word-ID shards have synthetic tests. No dataset was acquired. |
-| Training engine and checkpoints | Implemented and tested for tiny single-process cases | AdamW updates, RTD, causal-LM, multi-task, Matryoshka contrastive, registry-prototype/open-set and assistant-only SFT one-step runs, safetensors/JSON save and restore, RNG restoration, resume equivalence, and run-identity checks pass on CPU. This is software verification, not production training. |
-| Evaluation utilities | Implemented and tested | Classification, span, calibration, AUROC/FPR, bootstrap, and sealed-split utilities have synthetic tests. No held-out evaluation of trained ORION weights was run. |
-| SDK, CLI, and REST | Implemented and partially verified | SDK/API contracts, health endpoints, input limits, API-key behavior, streaming, and missing-weight errors have tests; CLI help/info and config validation were exercised. Inference requiring learned behavior cannot run without a trained release. |
-| MADAD adapter | Implemented and tested with synthetic payloads | Organizer/Tutor contract tests pass. No MADAD source was changed or imported by standalone packages. |
-| Release tooling and docs | Implemented and partially verified | Artifact/checkpoint verifiers, explicit Hub helpers, release gates, GitHub workflows, and handover docs exist. No artifact was uploaded and CI was not run. |
+| ORION-100M architecture | Executable count 100,291,840; CPU forward/backward, masking, padding and loss tests | Implemented and verified on synthetic inputs |
+| ORION-300M architecture | Executable unique count 306,763,200; tied embeddings, causal masks and KV-cache tests | Implemented and verified on synthetic inputs |
+| Tokenizer | Byte-level BPE recipe, train/validate/verify/export CLI, ID and hash checks, golden-vector verification | Software implemented; owner mapping approval and production tokenizer remain pending |
+| Data preparation | `orion-data prepare` and `verify-prepared`; local checksum-pinned JSONL, deterministic splits, PII masking, dedupe, aligned shards and packed memmaps | Implemented; synthetic behavior verified; no approved real corpus was prepared |
+| Single-process training | Objective steps, optimizer updates, RNG/sampler restoration, integrity checks and resume equivalence | Implemented and tested on tiny CPU fixtures |
+| DDP | Rank-aware sampler test passes; process-group/resume test exists | Not fully verified: Windows Gloo cannot create a network device |
+| SDK/API | Missing-weight behavior, schemas, limits, generation and batch contracts | Contract-tested; no trained inference artifact or clean installation |
+| Unified preflight | `orion preflight` validates source imports, dependencies and all configs; model mode checks local prerequisites | Implemented; currently reports Tokenizers 0.22.2 as incompatible with the required 0.23.3+ range |
+| Strict typing and code quality | Mypy 2.1.0, Ruff, format and compileall | Passed locally |
+| Parameter counts | `tools/count_params.py` | Exact plan counts verified |
 
-## Remaining work before training
+## Remaining gates
 
-- Review and approve the provisional tokenizer special-token ID map, then train
-  the v1 tokenizer on the separately authorized corpus.
-- Resolve data permissions and policy decisions D8, D9, D10, D13, and course
-  document authorization. No corpus or dataset acquisition is included here.
-- Run the implemented decoder-versus-encoder-decoder/prefix-LM E-300-1 pilot
-  after the plan's data and compute approvals; synthetic tests do not resolve
-  the architecture decision.
-- Implement and validate DDP/FSDP orchestration and exact distributed resume.
-- Generate `uv.lock` once a compatible `uv` resolver is available. No lockfile
-  was fabricated when the environment could not install `uv`.
-- The eight package wheels build and import from a workspace-local target. Still
-  run an isolated dependency-resolving install, CI, a dependency vulnerability
-  scan, and a separate security/legal/privacy review.
-- After those gates, train only with authorized data and approved compute, then
-  run held-out evaluation, calibration, parity, and hardware benchmarks.
+- The owner must approve the provisional tokenizer ID map and update the
+  approval record, machine status and tokenizer recipe consistently. The
+  tokenizer and model training commands remain unexecuted.
+- The configured package index does not provide Tokenizers 0.23.3 or `uv`.
+  There is no genuine `uv.lock`, dependency-resolving clean install, or
+  `pip check` result from an isolated ORION environment.
+- FSDP is not implemented. The two-process DDP Gloo test must run on a
+  supported Linux CPU runner. Multi-worker prefetch cursor recovery, CUDA/NCCL,
+  and FSDP checkpoint recovery remain unverified.
+- Data preparation was exercised only with synthetic fixtures. Corpus-scale
+  memory/throughput, real leakage, source rights, privacy, PII false negatives,
+  and legal sufficiency require approved data and human review.
+- Security scanners and GitHub workflows were not executed. No SBOM or
+  vulnerability report was generated. Offline behavior was not monitored with
+  network-denial tooling.
+- No GPU benchmarks, production-size memory measurements, ONNX parity,
+  quantization parity, or trained-model evaluation were run.
+- E-300-1 architecture selection remains pending the approved real-data pilot.
 
-## Training status
+## Validation result
 
-No production tokenizer training, dataset download, model pretraining,
-fine-tuning, instruction tuning, GPU job, release upload, or publication was
-performed. The tests use randomly initialized small models and synthetic local
-batches only. Model-facing SDK calls fail clearly when a trained local artifact
-is missing.
+The latest complete test run reports 77 passed and 1 Windows Gloo test skipped,
+with one PyTorch `pynvml` deprecation warning. See
+`reports/tests/validation-report.md` for commands and all limitations. No real
+training, corpus download, final tokenizer training, GitHub publication, or
+Hub upload was performed.

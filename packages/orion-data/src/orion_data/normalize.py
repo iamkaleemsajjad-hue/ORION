@@ -26,7 +26,12 @@ def normalize_text(text: str, *, fold_urdu_variants: bool = False) -> str:
         cleaned.append(char)
     result = "".join(cleaned).replace("\r\n", "\n").replace("\r", "\n")
     if fold_urdu_variants:
-        result = result.translate(str.maketrans({"ك": "ک", "ي": "ی", "ى": "ی"}))
+        translations: dict[str, str | int | None] = {
+            "ك": "ک",
+            "ي": "ی",
+            "ى": "ی",
+        }
+        result = result.translate(str.maketrans(translations))
     return result
 
 

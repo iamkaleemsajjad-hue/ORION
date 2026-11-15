@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 import torch
@@ -70,7 +71,9 @@ def test_sft_renderer_marks_only_assistant_content_and_end_tokens() -> None:
         render_chat_messages([{"role": "user", "content": "Only user"}], tokenizer, max_length=64)
 
 
-def test_multitask_finetuning_runs_and_checkpoints_one_synthetic_step(tmp_path) -> None:
+def test_multitask_finetuning_runs_and_checkpoints_one_synthetic_step(
+    tmp_path: Path,
+) -> None:
     data = tmp_path / "documents.jsonl"
     data.write_text(
         "\n".join(
@@ -139,7 +142,7 @@ def test_multitask_finetuning_runs_and_checkpoints_one_synthetic_step(tmp_path) 
     assert (tmp_path / "run" / "checkpoints" / "latest.json").is_file()
 
 
-def test_matryoshka_contrastive_training_runs_one_synthetic_step(tmp_path) -> None:
+def test_matryoshka_contrastive_training_runs_one_synthetic_step(tmp_path: Path) -> None:
     data = tmp_path / "pairs.jsonl"
     data.write_text(
         "\n".join(
@@ -216,14 +219,16 @@ def test_course_open_set_loss_trains_known_and_unknown_examples() -> None:
         unknown_margin=0.3,
         unknown_weight=2.0,
     )
-    loss.backward()
+    torch.autograd.backward(loss)
     assert set(parts) == {"known_course", "unknown_margin"}
     assert torch.isfinite(loss)
     assert logits.grad is not None and logits.grad[0].abs().sum() > 0
     assert cosine.grad is not None and cosine.grad[1, 0] > 0
 
 
-def test_course_matching_training_runs_known_unknown_step_and_checkpoints(tmp_path) -> None:
+def test_course_matching_training_runs_known_unknown_step_and_checkpoints(
+    tmp_path: Path,
+) -> None:
     registry = tmp_path / "registry.json"
     registry.write_text(
         json.dumps(
@@ -318,7 +323,7 @@ def test_course_matching_training_runs_known_unknown_step_and_checkpoints(tmp_pa
     assert torch.isfinite(torch.tensor(evaluated["loss"]))
 
 
-def test_assistant_only_sft_runs_and_checkpoints_one_synthetic_step(tmp_path) -> None:
+def test_assistant_only_sft_runs_and_checkpoints_one_synthetic_step(tmp_path: Path) -> None:
     data = tmp_path / "sft.jsonl"
     record = {
         "input_ids": [5, 17, 300, 19, 18, 301, 302, 19],
@@ -370,7 +375,7 @@ def test_assistant_only_sft_runs_and_checkpoints_one_synthetic_step(tmp_path) ->
     assert (tmp_path / "sft-run" / "checkpoints" / "latest.json").is_file()
 
 
-def test_sft_jsonl_rejects_records_without_assistant_targets(tmp_path) -> None:
+def test_sft_jsonl_rejects_records_without_assistant_targets(tmp_path: Path) -> None:
     data = tmp_path / "invalid.jsonl"
     data.write_text(
         json.dumps({"input_ids": [5, 17, 300], "assistant_mask": [False, False, False]}),

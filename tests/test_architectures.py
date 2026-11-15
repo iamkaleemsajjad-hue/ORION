@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from typing import cast
+
+import pytest
 import torch
 
 from orion_100m.config import Orion100MConfig
@@ -7,7 +10,12 @@ from orion_100m.model.encoder import Orion100MEncoder
 from orion_100m.model.pretraining import Orion100MRTDPretrainer
 from orion_300m.config import Orion300MConfig
 from orion_300m.model.decoder import Orion300MDecoder
-from orion_300m.model.encoder_decoder import Orion300MEncoderDecoderPilot
+from orion_300m.model.encoder_decoder import (
+    DecoderBlock as EncoderDecoderBlock,
+)
+from orion_300m.model.encoder_decoder import (
+    Orion300MEncoderDecoderPilot,
+)
 from orion_core.blocks.rotary import RotaryEmbedding, apply_rotary
 
 
@@ -18,6 +26,11 @@ def test_planned_default_body_parameter_counts_on_meta_device() -> None:
     assert encoder.parameter_count() == 100_291_840
     assert sum(parameter.numel() for parameter in decoder.parameters()) == 306_763_200
     assert decoder.lm_head.weight is decoder.token_embeddings.weight
+
+
+def test_decoder_rejects_out_of_vocabulary_generation_control_ids() -> None:
+    with pytest.raises(ValueError, match="special token IDs"):
+        Orion300MConfig(vocab_size=512, end_token_id=512)
 
 
 def _small_encoder_config() -> Orion100MConfig:
@@ -178,5 +191,6 @@ def test_encoder_decoder_pilot_cross_attention_forward_and_backward() -> None:
     assert output.loss is not None and torch.isfinite(output.loss)
     output.loss.backward()
     assert model.token_embeddings.weight.grad is not None
-    assert model.decoder[0].cross_attention.query.weight.grad is not None
+    decoder_layer = cast(EncoderDecoderBlock, model.decoder[0])
+    assert decoder_layer.cross_attention.query.weight.grad is not None
     assert model.lm_head.weight is model.token_embeddings.weight

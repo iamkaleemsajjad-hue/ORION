@@ -2,23 +2,33 @@
 
 Training is explicit and separate from package installation. The shared trainer
 supports gradient accumulation, finite-loss/gradient checks, clipping, AdamW
-parameter groups, warmup/trapezoidal and warmup-stable-decay schedules, and
-deterministic seeds. Model packages expose objective-specific entry points.
+parameter groups, warmup and decay schedules, and deterministic seeds.
+Model-specific packages expose RTD, causal-LM, supervised, contrastive, course
+matching and SFT entry points.
 
-Checkpoints contain `model.safetensors`, `optimizer.safetensors`, `rng.safetensors`,
-`training_state.json`, and `manifest.json`. The manifest hashes all three safe
-tensor files and `training_state.json`. The JSON records run identity,
-step/tokens seen, scheduler and gradient-scaler state, data cursor, Python and
-NumPy RNG metadata, and hashes. Model, optimizer, and framework RNG tensors use
-Safetensors. No ORION code calls `torch.load` or loads a pickle artifact. See
-ADR-001 for the conflict with the plan's `.pt` filename.
+Checkpoint directories contain `model.safetensors`,
+`model.safetensors.sha256`, `optimizer.safetensors`,
+`optimizer.safetensors.sha256`, `rng.safetensors`,
+`rng.safetensors.sha256`, `training_state.json`, and `manifest.json`.
+The JSON records run identity, step/tokens seen, scheduler and gradient-scaler
+state, data cursor, Python and NumPy RNG metadata, and checkpoint hashes.
+Model, optimizer, and framework RNG tensors use Safetensors. ORION does not
+call `torch.load` or load pickle artifacts. See ADR-001 for the conflict with
+the plan's `.pt` filename. The `orion-train info` output is regression-tested
+against a checkpoint actually written by `CheckpointManager`.
 
-Exact resume is covered for small deterministic single-process tests. Exact
-multi-worker prefetch, DDP, and FSDP resume need distributed validation before
-those modes are claimed production-ready.
+Exact resume is tested for tiny deterministic single-process runs. The DDP
+implementation stores per-rank RNG, sampler and scaler state in the rank-zero
+checkpoint and has a two-process Gloo regression test for gradient
+synchronization and interruption/resume equivalence. That test was skipped in
+this Windows environment because the PyTorch Gloo backend cannot create a
+network device; run it on a supported Linux CPU/Gloo runner before relying on
+DDP. FSDP and exact recovery with DataLoader worker prefetch are not
+implemented/verified.
 
-Training resume requires matching model, configuration, and training-data
-hashes. Evaluation checks model/configuration identity while allowing a
-different held-out data hash; it does not restore the training sampler cursor
-into the evaluation dataset.
-
+For DDP, all ranks must see the same checkpoint directory on shared storage and
+resume with the same world size. Set `trainer.distributed_strategy` to
+`ddp`; launch model-specific training through `torchrun`. The default
+`none` strategy is single-process. Call `Trainer.close()` when managing an
+ORION-owned process group from a long-lived Python process; CLI processes
+release it at exit.

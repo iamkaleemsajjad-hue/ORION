@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import torch
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from torch.utils.data import DataLoader
 
@@ -56,10 +57,17 @@ def _make_training(
     config: CausalTrainingConfig,
     *,
     device: str,
-) -> tuple[Trainer, DataLoader, StatefulRandomSampler, TokenBlockDataset]:
+) -> tuple[
+    Trainer[Orion300MDecoder, dict[str, torch.Tensor]],
+    DataLoader[dict[str, torch.Tensor]],
+    StatefulRandomSampler,
+    TokenBlockDataset,
+]:
     dataset = TokenBlockDataset(token_shard, sequence_length=config.sequence_length)
     sampler = StatefulRandomSampler(dataset, seed=config.trainer.seed)
-    loader = DataLoader(dataset, batch_size=config.batch_size, sampler=sampler, num_workers=0)
+    loader: DataLoader[dict[str, torch.Tensor]] = DataLoader(
+        dataset, batch_size=config.batch_size, sampler=sampler, num_workers=0
+    )
     seed_everything(config.trainer.seed)
     model = Orion300MDecoder(config.model)
     optimizer = build_adamw(model, lr=config.learning_rate, weight_decay=config.weight_decay)
@@ -70,7 +78,7 @@ def _make_training(
         warmup_steps=config.warmup_steps,
     )
     manager = CheckpointManager(Path(output_dir) / "checkpoints")
-    trainer = Trainer(
+    trainer: Trainer[Orion300MDecoder, dict[str, torch.Tensor]] = Trainer(
         model,
         optimizer,
         config=config.trainer,
@@ -153,11 +161,14 @@ def evaluate_causal_lm(
     )
     loader = DataLoader(dataset, batch_size=config.batch_size, shuffle=False, num_workers=0)
     loss = trainer.evaluate(loader, max_batches=max_batches)
+    manager = trainer.checkpoint_manager
+    if manager is None:
+        raise RuntimeError("evaluation checkpoint manager was not configured")
     return {
         "status": "evaluated",
         "loss": loss,
         "batches": min(len(loader), max_batches or len(loader)),
-        "checkpoint": str(trainer.checkpoint_manager.latest()),
+        "checkpoint": str(manager.latest()),
         "token_shard_sha256": dataset.sha256,
     }
 

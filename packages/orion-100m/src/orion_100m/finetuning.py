@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import torch
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -166,7 +166,8 @@ class JsonlDocumentDataset(Dataset[dict[str, Any]]):
         with self.path.open("rb") as stream:
             stream.seek(self.offsets[index])
             record = json.loads(stream.readline())
-        return record
+        self._validate_record(record, index + 1)
+        return cast(dict[str, Any], record)
 
 
 def collate_document_records(
@@ -209,7 +210,11 @@ def _make_trainer(
     *,
     initial_checkpoint: str | Path | None,
     device: str,
-) -> tuple[Trainer, DataLoader, JsonlDocumentDataset]:
+) -> tuple[
+    Trainer[Orion100MDocumentModel, dict[str, torch.Tensor]],
+    DataLoader[dict[str, torch.Tensor]],
+    JsonlDocumentDataset,
+]:
     dataset = JsonlDocumentDataset(
         path,
         labels=labels,
@@ -356,12 +361,15 @@ def evaluate_multitask(
         }
     )
     loss = trainer.evaluate(training_loader, max_batches=max_batches)
+    manager = trainer.checkpoint_manager
+    if manager is None:
+        raise RuntimeError("evaluation checkpoint manager was not configured")
     return {
         "status": "evaluated",
         "objective": "multitask_document_finetuning",
         "loss": loss,
         "data_sha256": dataset.sha256,
-        "checkpoint": str(trainer.checkpoint_manager.latest()),
+        "checkpoint": str(manager.latest()),
     }
 
 

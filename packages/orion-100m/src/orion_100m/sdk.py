@@ -8,10 +8,11 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import torch
+from numpy.typing import NDArray
 from pydantic import BaseModel, Field, ValidationError
 
 from orion_100m.config import Orion100MConfig
@@ -126,6 +127,16 @@ def _validate_calibration_metadata(
     return thresholds, temperatures
 
 
+def _validated_sha256(value: object, field: str) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(character not in "0123456789abcdef" for character in value.lower())
+    ):
+        raise ArtifactIntegrityError(f"A trained ORION-100M release has an invalid {field}")
+    return value.lower()
+
+
 class Orion100M:
     """Loaded trained local encoder with explicit label maps and calibration metadata."""
 
@@ -187,26 +198,12 @@ class Orion100M:
         ):
             if not artifact.get(field):
                 raise ArtifactIntegrityError(f"A trained ORION-100M release is missing {field}")
-        data_digest = artifact.get("training_data_manifest_sha256")
-        if (
-            not isinstance(data_digest, str)
-            or len(data_digest) != 64
-            or any(character not in "0123456789abcdef" for character in data_digest.lower())
-        ):
-            raise ArtifactIntegrityError("training data manifest SHA-256 is invalid")
-        weights_digest = artifact.get("weights_sha256")
-        tokenizer_digest = artifact.get("tokenizer_sha256")
-        for field, digest in (
-            ("weights_sha256", weights_digest),
-            ("tokenizer_sha256", tokenizer_digest),
-        ):
-            if (
-                not isinstance(digest, str)
-                or len(digest) != 64
-                or any(character not in "0123456789abcdef" for character in digest.lower())
-            ):
-                raise ArtifactIntegrityError(f"A trained ORION-100M release has an invalid {field}")
-        if sha256_file(weights_path) != weights_digest.lower():
+        _validated_sha256(
+            artifact.get("training_data_manifest_sha256"), "training_data_manifest_sha256"
+        )
+        weights_digest = _validated_sha256(artifact.get("weights_sha256"), "weights_sha256")
+        tokenizer_digest = _validated_sha256(artifact.get("tokenizer_sha256"), "tokenizer_sha256")
+        if sha256_file(weights_path) != weights_digest:
             raise ArtifactIntegrityError("model.safetensors SHA-256 does not match config.json")
         config_data = artifact.get("model_config", {})
         if not isinstance(config_data, dict):
@@ -361,7 +358,7 @@ class Orion100M:
                 if label.casefold() not in {"unknown", "other"}
             ]
             probabilities = torch.softmax(subject_logits[0], dim=-1)
-            max_known = max((float(probabilities[index]) for index, _ in known), default=0.0)
+            max_known = max((float(probabilities[index].item()) for index, _ in known), default=0.0)
             unknown_result = {"is_unknown": max_known < class_threshold, "score": 1.0 - max_known}
         return ClassifyResult(
             model=self.model_info(),
@@ -463,7 +460,7 @@ class Orion100M:
         return ExtractResult(model=self.model_info(), fields=extracted)
 
     @torch.inference_mode()
-    def get_embeddings(self, texts: Sequence[str], *, dim: int = 640) -> np.ndarray:
+    def get_embeddings(self, texts: Sequence[str], *, dim: int = 640) -> NDArray[np.float32]:
         """Return normalized masked-mean embeddings or a trained Matryoshka prefix."""
         if dim not in {640, 256, 128} or dim > self.model.config.hidden_size:
             raise ValueError("dim must be one of the supported prefix dimensions 640, 256, or 128")
@@ -483,7 +480,7 @@ class Orion100M:
         output = self.model.encoder(rows["input_ids"], attention_mask=rows["attention_mask"])
         vectors = output.pooled_output[:, :dim]
         vectors = torch.nn.functional.normalize(vectors.float(), dim=-1)
-        return vectors.cpu().numpy().astype(np.float32, copy=False)
+        return cast(NDArray[np.float32], vectors.cpu().numpy().astype(np.float32, copy=False))
 
     def model_info(self) -> dict[str, Any]:
         """Return local trained artifact metadata; taxonomy names come from its config."""

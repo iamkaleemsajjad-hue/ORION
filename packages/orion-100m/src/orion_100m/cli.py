@@ -144,6 +144,10 @@ def _document(args: argparse.Namespace) -> Any:
 
 
 def _emit(value: Any) -> None:
+    import torch.distributed as dist
+
+    if dist.is_initialized() and dist.get_rank() != 0:
+        return
     if hasattr(value, "model_dump"):
         value = value.model_dump(mode="json")
     print(json.dumps(value, ensure_ascii=False, indent=2))
@@ -357,6 +361,10 @@ def main(argv: list[str] | None = None) -> int:
             _emit(model.extract(document, fields=args.fields))
         return 0
     except Exception as exc:
+        import torch.distributed as dist
+
+        if dist.is_initialized() and dist.get_rank() != 0:
+            return 2
         print(
             json.dumps(
                 {

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Protocol
 
@@ -18,10 +18,33 @@ class Encoder(Protocol):
     version: str
     sha256: str
 
-    def encode(self, text: str): ...
+    def encode(
+        self,
+        text: str,
+        *,
+        add_bos: bool = False,
+        add_eos: bool = False,
+        allow_special_tokens: bool = False,
+        max_length: int | None = None,
+        truncation: str | None = None,
+    ) -> EncodedText: ...
+
+    def special_token_id(self, token: str) -> int: ...
 
 
-def tokenize_texts(texts: Iterable[str], tokenizer: Encoder) -> tuple[list[int], list[int]]:
+class EncodedText(Protocol):
+    """Minimal typed result returned by the tokenizer backends used here."""
+
+    @property
+    def input_ids(self) -> Sequence[int]: ...
+
+    @property
+    def word_ids(self) -> Sequence[int | None]: ...
+
+
+def tokenize_texts(
+    texts: Iterable[str], tokenizer: Encoder, *, add_eos: bool = False
+) -> tuple[list[int], list[int]]:
     """Encode local text in order and maintain globally distinct word IDs."""
     token_ids: list[int] = []
     word_ids: list[int] = []
@@ -30,7 +53,7 @@ def tokenize_texts(texts: Iterable[str], tokenizer: Encoder) -> tuple[list[int],
         normalized = normalize_text(text)
         if not normalized.strip():
             continue
-        encoded = tokenizer.encode(normalized)
+        encoded = tokenizer.encode(normalized, add_eos=add_eos)
         token_ids.extend(encoded.input_ids)
         present = [value for value in encoded.word_ids if value is not None]
         for value in encoded.word_ids:
@@ -43,10 +66,15 @@ def tokenize_texts(texts: Iterable[str], tokenizer: Encoder) -> tuple[list[int],
 
 
 def write_aligned_token_shards(
-    texts: Iterable[str], tokenizer: Encoder, output_dir: str | Path
+    texts: Iterable[str],
+    tokenizer: Encoder,
+    output_dir: str | Path,
+    *,
+    add_eos: bool = False,
+    synthetic_fixture: bool = False,
 ) -> dict[str, object]:
     """Write token IDs, whole-word IDs, and a tokenizer-hash manifest locally."""
-    tokens, words = tokenize_texts(texts, tokenizer)
+    tokens, words = tokenize_texts(texts, tokenizer, add_eos=add_eos)
     if not tokens:
         raise ValueError("no non-empty text was tokenized")
     root = Path(output_dir)
@@ -58,7 +86,7 @@ def write_aligned_token_shards(
     manifest = {
         "schema_version": "1.0",
         "status": "locally_prepared",
-        "synthetic_fixture": False,
+        "synthetic_fixture": synthetic_fixture,
         "tokenizer_version": tokenizer.version,
         "tokenizer_sha256": tokenizer.sha256,
         "token_count": len(tokens),

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import cast
+
 import torch
 from torch.nn import functional as F
 
@@ -60,8 +63,9 @@ def fit_temperature(logits: torch.Tensor, labels: torch.Tensor, *, max_iter: int
         optimizer.zero_grad()
         temperature = log_temperature.exp().clamp(0.05, 20.0)
         loss = F.cross_entropy(values / temperature, targets)
-        loss.backward()
+        torch.autograd.backward(loss)
         return loss
 
-    optimizer.step(closure)
+    typed_step = cast(Callable[[Callable[[], torch.Tensor]], object], optimizer.step)
+    typed_step(closure)
     return float(log_temperature.detach().exp().clamp(0.05, 20.0).cpu())

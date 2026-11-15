@@ -66,6 +66,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _emit(value: Any) -> None:
+    import torch.distributed as dist
+
+    if dist.is_initialized() and dist.get_rank() != 0:
+        return
     if hasattr(value, "to_dict"):
         value = value.to_dict()
     elif hasattr(value, "model_dump"):
@@ -114,13 +118,13 @@ def main(argv: list[str] | None = None) -> int:
                     raise ValueError("--init-checkpoint is required for the sft objective")
                 from orion_300m.sft import SFTTrainingConfig, train_sft_jsonl
 
-                config = SFTTrainingConfig.model_validate(
+                sft_config = SFTTrainingConfig.model_validate(
                     json.loads(Path(args.config_json).read_text(encoding="utf-8"))
                 )
-                result = train_sft_jsonl(
+                training_result = train_sft_jsonl(
                     args.sft_jsonl,
                     args.output,
-                    config,
+                    sft_config,
                     initial_checkpoint=args.init_checkpoint,
                     device=args.device,
                     resume=args.resume,
@@ -130,13 +134,13 @@ def main(argv: list[str] | None = None) -> int:
                     raise ValueError("--tokens is required for the causal objective")
                 from orion_300m.training import CausalTrainingConfig, train_causal_lm
 
-                config = CausalTrainingConfig.model_validate(
+                causal_config = CausalTrainingConfig.model_validate(
                     json.loads(Path(args.config_json).read_text(encoding="utf-8"))
                 )
-                result = train_causal_lm(
-                    args.tokens, args.output, config, device=args.device, resume=args.resume
+                training_result = train_causal_lm(
+                    args.tokens, args.output, causal_config, device=args.device, resume=args.resume
                 )
-            _emit(result)
+            _emit(training_result)
             return 0
         if args.command == "architecture-pilot":
             if not args.confirm_training:
@@ -148,7 +152,7 @@ def main(argv: list[str] | None = None) -> int:
                 run_architecture_pilot,
             )
 
-            result = run_architecture_pilot(
+            pilot_result = run_architecture_pilot(
                 args.training_jsonl,
                 args.validation_jsonl,
                 args.output,
@@ -156,7 +160,7 @@ def main(argv: list[str] | None = None) -> int:
                 device=args.device,
                 resume=args.resume,
             )
-            _emit(result)
+            _emit(pilot_result)
             return 0
         if args.command == "evaluate":
             if args.objective == "sft":
@@ -164,13 +168,13 @@ def main(argv: list[str] | None = None) -> int:
                     raise ValueError("--sft-jsonl is required for the sft objective")
                 from orion_300m.sft import SFTTrainingConfig, evaluate_sft_jsonl
 
-                config = SFTTrainingConfig.model_validate(
+                sft_config = SFTTrainingConfig.model_validate(
                     json.loads(Path(args.config_json).read_text(encoding="utf-8"))
                 )
-                result = evaluate_sft_jsonl(
+                evaluation_result = evaluate_sft_jsonl(
                     args.sft_jsonl,
                     args.checkpoint_dir,
-                    config,
+                    sft_config,
                     device=args.device,
                     max_batches=args.max_batches,
                 )
@@ -179,17 +183,17 @@ def main(argv: list[str] | None = None) -> int:
                     raise ValueError("--tokens is required for the causal objective")
                 from orion_300m.training import CausalTrainingConfig, evaluate_causal_lm
 
-                config = CausalTrainingConfig.model_validate(
+                causal_config = CausalTrainingConfig.model_validate(
                     json.loads(Path(args.config_json).read_text(encoding="utf-8"))
                 )
-                result = evaluate_causal_lm(
+                evaluation_result = evaluate_causal_lm(
                     args.tokens,
                     args.checkpoint_dir,
-                    config,
+                    causal_config,
                     device=args.device,
                     max_batches=args.max_batches,
                 )
-            _emit(result)
+            _emit(evaluation_result)
             return 0
         if args.command == "serve":
             import uvicorn
@@ -214,29 +218,35 @@ def main(argv: list[str] | None = None) -> int:
             "request_id": args.request_id,
         }
         if args.command == "generate":
-            result = model.generate(
+            generation_result = model.generate(
                 args.prompt or sys.stdin.read(), documents=documents, task="generate", **common
             )
         elif args.command == "answer":
-            result = model.answer(args.prompt, documents=documents, **common)
+            generation_result = model.answer(args.prompt, documents=documents, **common)
         elif args.command == "summarize":
-            result = model.summarize(documents=documents, **common)
+            generation_result = model.summarize(documents=documents, **common)
         elif args.command == "questions":
-            result = model.generate_questions(documents=documents, count=args.count, **common)
+            generation_result = model.generate_questions(
+                documents=documents, count=args.count, **common
+            )
         elif args.command == "flashcards":
-            result = model.generate_flashcards(
+            generation_result = model.generate_flashcards(
                 args.prompt or "the supplied material",
                 documents=documents,
                 count=args.count,
                 **common,
             )
         else:
-            result = model.generate_mcq(
+            generation_result = model.generate_mcq(
                 args.prompt or "the supplied material", documents=documents, **common
             )
-        _emit(result)
+        _emit(generation_result)
         return 0
     except Exception as exc:
+        import torch.distributed as dist
+
+        if dist.is_initialized() and dist.get_rank() != 0:
+            return 2
         print(
             json.dumps(
                 {

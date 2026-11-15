@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import torch
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -120,7 +120,9 @@ class ContrastivePairDataset(Dataset[dict[str, list[int]]]):
     def __getitem__(self, index: int) -> dict[str, list[int]]:
         with self.path.open("rb") as stream:
             stream.seek(self.offsets[index])
-            return json.loads(stream.readline())
+            record = json.loads(stream.readline())
+        self._validate(record, index + 1)
+        return cast(dict[str, list[int]], record)
 
 
 def _collate_pairs(
@@ -149,7 +151,11 @@ def _make_trainer(
     *,
     initial_checkpoint: str | Path | None,
     device: str,
-) -> tuple[Trainer, DataLoader, ContrastivePairDataset]:
+) -> tuple[
+    Trainer[Orion100MEncoder, dict[str, torch.Tensor]],
+    DataLoader[dict[str, torch.Tensor]],
+    ContrastivePairDataset,
+]:
     dataset = ContrastivePairDataset(data_jsonl, config=config)
     batch_size = min(config.batch_size, len(dataset))
     sampler = StatefulRandomBatchSampler(dataset, batch_size=batch_size, seed=config.trainer.seed)
@@ -217,7 +223,7 @@ def _make_trainer(
         data_state_restorer=lambda state: sampler.load_state_dict(state["sampler"]),
         checkpoint_metadata=identity,
     )
-    return trainer, loader, dataset
+    return trainer, cast(DataLoader[dict[str, torch.Tensor]], loader), dataset
 
 
 def train_contrastive(
@@ -285,12 +291,15 @@ def evaluate_contrastive(
         }
     )
     loss = trainer.evaluate(loader, max_batches=max_batches)
+    manager = trainer.checkpoint_manager
+    if manager is None:
+        raise RuntimeError("evaluation checkpoint manager was not configured")
     return {
         "status": "evaluated",
         "objective": "matryoshka_contrastive",
         "loss": loss,
         "data_sha256": dataset.sha256,
-        "checkpoint": str(trainer.checkpoint_manager.latest()),
+        "checkpoint": str(manager.latest()),
     }
 
 

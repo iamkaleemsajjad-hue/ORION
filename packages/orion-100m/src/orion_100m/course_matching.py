@@ -231,7 +231,12 @@ def _make_training(
     *,
     initial_checkpoint: str | Path | None,
     device: str,
-) -> tuple[Trainer, DataLoader, CourseRegistry, CourseDocumentDataset]:
+) -> tuple[
+    Trainer[Orion100MDocumentModel, dict[str, torch.Tensor]],
+    DataLoader[dict[str, torch.Tensor]],
+    CourseRegistry,
+    CourseDocumentDataset,
+]:
     registry = CourseRegistry(registry_json, config=config)
     dataset = CourseDocumentDataset(data_jsonl, registry=registry, config=config)
     batch_size = min(config.batch_size, len(dataset))
@@ -430,13 +435,16 @@ def evaluate_course_matching(
         }
     )
     loss = trainer.evaluate(loader, max_batches=max_batches)
+    manager = trainer.checkpoint_manager
+    if manager is None:
+        raise RuntimeError("evaluation checkpoint manager was not configured")
     return {
         "status": "evaluated",
         "objective": "registry_prototype_open_set",
         "loss": loss,
         "registry_sha256": registry.sha256,
         "data_sha256": dataset.sha256,
-        "checkpoint": str(trainer.checkpoint_manager.latest()),
+        "checkpoint": str(manager.latest()),
     }
 
 

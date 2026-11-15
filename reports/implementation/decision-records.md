@@ -1,37 +1,36 @@
 # Implementation decision records
 
-## ADR-001 — Safe resumable training state
+## ADR-001 - Safe resumable training state
 
 **Status:** Accepted for software implementation, 2026-11-14.
 
-**Context:** Plan §25 names `training_state.pt` for checkpointing, but §30.3
-requires safetensors only and rejects pickle loading. A `.pt` file commonly
-uses pickle serialization; even PyTorch's restricted `weights_only=True` mode
-does not make arbitrary files a release-safe model format.
+**Context:** Plan Section 25 names `training_state.pt`, while Section 30.3
+requires Safetensors and rejects pickle loading. A `.pt` artifact may use
+pickle serialization and is not suitable for untrusted release artifacts.
 
-**Decision:** Keep model weights and optimizer tensor state in separate
-`.safetensors` files. Store scheduler counters, data cursor, optimizer group
-metadata, RNG state, and file hashes in JSON. Never deserialize a Python object
-or call `torch.load` in ORION packages.
+**Decision:** Store model and optimizer tensor state in separate Safetensors
+files. Store scheduler/data cursor metadata, optimizer group metadata, RNG
+metadata, and hashes in JSON. ORION does not use `torch.load` or pickle to
+restore model/checkpoint files.
 
-**Consequence:** The resulting checkpoint is resumable for supported PyTorch
-optimizers and deterministic single-process loaders. It is intentionally not
-binary-compatible with a hypothetical `training_state.pt` artifact. DDP/FSDP
-and multi-worker prefetch exact-resume behavior still require dedicated tests.
+**Consequence:** The checkpoint is resumable for the supported
+single-process paths and for DDP rank state in the implemented format. A
+two-process Gloo test exists but was skipped on the current Windows PyTorch
+build because it cannot create a Gloo network device. FSDP is not implemented.
+Exact recovery with multi-worker DataLoader prefetch is not verified.
 
-## ADR-002 — No trained release artifacts in the source repository
+## ADR-002 - No trained release artifacts in the source repository
 
 **Status:** Accepted.
 
-**Context:** The task forbids fabricating checkpoints and prohibits running
-training or downloading a trained tokenizer corpus.
+**Context:** The task forbids fabricated checkpoints and prohibits training or
+downloading a tokenizer corpus during software implementation.
 
-**Decision:** No tokenizer model, model weights, dataset shards, or release
-claims are included. Runtime `load` APIs require local hash-verified artifacts
-and raise a typed missing-artifact error when those artifacts are absent.
-Small randomly initialized configurations and a tiny synthetic tokenizer may
-be used only inside software tests.
+**Decision:** No tokenizer model, model weights, real dataset shards, or
+trained-release claims are included. Runtime load APIs require local
+hash-verified artifacts and raise typed missing-artifact errors when the
+artifacts are absent. Random initialization and synthetic tokenizers are
+limited to software tests.
 
-**Consequence:** SDK inference is available only after a separately governed
-training and release phase.
-
+**Consequence:** SDK inference requiring learned behavior remains unavailable
+until a separately approved training and release phase.
