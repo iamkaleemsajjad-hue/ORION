@@ -1,0 +1,14 @@
+{
+  "seed": 1729,
+  "split_proportions": [0.98, 0.01, 0.01],
+  "sequence_length": 2048,
+  "max_segment_characters": 4000,
+  "min_characters": 80,
+  "max_symbol_ratio": 0.45,
+  "max_repeated_line_ratio": 0.35,
+  "near_duplicate_threshold": 0.85,
+  "near_duplicate_permutations": 64,
+  "near_duplicate_bands": 16,
+  "mask_personal_data": true,
+  "fold_urdu_variants": false
+}
