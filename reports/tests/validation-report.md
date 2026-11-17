@@ -1,6 +1,6 @@
 # Software validation report
 
-Validation date: 2026-11-14. Environment: Windows, Python 3.10.11,
+Historical validation snapshot: 2026-11-14. Environment: Windows, Python 3.10.11,
 PyTorch 2.9.1+cpu. CUDA was unavailable. Tests used synthetic/local fixtures;
 no real dataset, production tokenizer, trained model, GPU job or release upload
 was produced.
@@ -58,3 +58,46 @@ missing weights, package independence and synthetic DDP sampler partitioning.
 The final gate status and next actions are in
 `reports/implementation/training-readiness-checklist.md` and
 `reports/implementation/final_engineering_handover.md`.
+
+
+## Final recheck (2026-11-15)
+
+Against revision `7d3186c7a0378ef0878a49c524068338af945547`, the latest full
+`python -m pytest -q` run reported **77 passed, 1 skipped, 4 warnings in 27.69
+seconds**. The skipped check remains the Windows two-process Gloo test. Strict
+mypy (121 files), Ruff lint, Ruff security rules, Ruff format (210 files), and compileall passed.
+Eight package wheels built with dependencies disabled; this is not clean-install
+evidence. The initial Ruff security scan reported seven reviewed findings; one redundant assert was removed and six narrow context-specific annotations were added, after which the scan passed. `pip-audit` failed before
+completing because the configured proxy refused its vulnerability database
+request. The CycloneDX source declaration inventory passed CycloneDX 1.6 schema
+validation but is not a resolved release SBOM. A local Markdown target scan
+checked 88 Markdown files and 57 local links with no missing targets. No data
+download, tokenizer/model training, GPU job, GitHub workflow, commit or push
+was performed. See `reports/final/FINAL_VERIFICATION_LOG.md` for exact scope.
+
+## Final engineering continuation (2026-11-16)
+
+After implementing acknowledged sampler cursors for worker-prefetch recovery,
+adding a direct Pydantic dependency to `orion-train`, and extending the tiny
+model-specific training test to resume through each public model runner, the
+full suite reported **82 passed, 2 skipped, 4 warnings**. The skipped tests are
+the real two-process Gloo recovery test and the real two-worker prefetch
+resume-equivalence test; Windows policy blocks both process paths. The two
+tests are configured in the Ubuntu `multiprocess-recovery` CI job, which has
+not run from this local workspace.
+
+Strict mypy (121 files), Ruff lint, Ruff S security rules, Ruff formatting
+(212 files), compilation and all three workflow YAML parses passed. The model
+count tool returned 100,291,840 and 306,763,200 unique parameters and matched
+both targets. All eight wheels built with `--no-deps`; `orion-train` wheel
+metadata was checked for `Requires-Dist: pydantic<3,>=2.7`. A selected
+tokenizer/SDK/independence suite passed 18 tests with HTTP(S)/ALL proxy access
+pointed at a closed local port. This is a proxy-blocked smoke check, not a
+monitored network-denial test.
+
+`pip-audit --local` failed while connecting to `pypi.org` through the configured
+proxy at `127.0.0.1:9`; no vulnerability-clean result is implied. WSL returned
+`E_ACCESSDENIED`, and Docker could not connect to its Linux engine. No clean
+dependency-resolving install, Linux multiprocessing run, security database
+scan, production data workflow, tokenizer training or model training was
+completed.

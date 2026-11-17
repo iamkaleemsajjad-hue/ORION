@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import random
 import shutil
+import sys
 from pathlib import Path
 from typing import cast
 
@@ -63,6 +65,79 @@ def test_resume_sampler_restores_same_remaining_order() -> None:
     restored = StatefulRandomSampler(list(range(20)), seed=13)
     restored.load_state_dict(state)
     assert consumed + list(restored) == consumed + expected
+
+
+def test_acknowledged_sampler_cursor_rewinds_prefetched_indices() -> None:
+    sampler = StatefulRandomSampler(list(range(20)), seed=13)
+    full_order = list(StatefulRandomSampler(list(range(20)), seed=13))
+    sampler.enable_acknowledged_cursor()
+    iterator = iter(sampler)
+    prefetched = [next(iterator) for _ in range(8)]
+    assert prefetched == full_order[:8]
+
+    sampler.acknowledge(2)
+    state = sampler.state_dict()
+    assert state["cursor"] == 2
+    assert sampler.cursor == 8
+
+    restored = StatefulRandomSampler(list(range(20)), seed=13)
+    restored.load_state_dict(state)
+    assert prefetched[:2] + list(restored) == full_order
+    sampler.rewind_unconsumed()
+    assert sampler.cursor == 2
+
+
+def test_acknowledged_batch_sampler_cursor_counts_samples() -> None:
+    rows = list(range(24))
+    full_batches = list(StatefulRandomBatchSampler(rows, batch_size=2, seed=29))
+    sampler = StatefulRandomBatchSampler(rows, batch_size=2, seed=29)
+    sampler.enable_acknowledged_cursor()
+    iterator = iter(sampler)
+    prefetched = [next(iterator) for _ in range(4)]
+    assert prefetched == full_batches[:4]
+
+    sampler.acknowledge(2)
+    state = sampler.state_dict()
+    assert state["cursor"] == 2
+    restored = StatefulRandomBatchSampler(rows, batch_size=2, seed=29)
+    restored.load_state_dict(state)
+    assert full_batches[:1] + list(restored) == full_batches
+
+
+def test_trainer_reports_mean_loss_for_accumulated_microbatches() -> None:
+    model = torch.nn.Linear(1, 1, bias=False)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+    trainer: Trainer[torch.nn.Linear, dict[str, torch.Tensor]] = Trainer(
+        model,
+        optimizer,
+        config=TrainerConfig(max_steps=1, grad_accum_steps=2),
+        device="cpu",
+        loss_function=lambda network, batch: network.weight.sum() * 0 + batch["loss"],
+    )
+
+    losses = trainer.fit(
+        [
+            {"loss": torch.tensor(2.0)},
+            {"loss": torch.tensor(4.0)},
+        ]
+    )
+
+    assert losses == [3.0]
+    assert trainer.state.loss_ema == 3.0
+
+
+def test_trainer_config_validates_worker_options() -> None:
+    with pytest.raises(ValueError, match="persistent_workers requires"):
+        TrainerConfig(max_steps=1, persistent_workers=True)
+
+    options = TrainerConfig(max_steps=1, num_workers=2).data_loader_options
+    assert options.num_workers == 2
+    assert options.prefetch_factor == 2
+    assert options.persistent_workers is False
+
+    single_process = TrainerConfig(max_steps=1).data_loader_options
+    assert single_process.num_workers == 0
+    assert single_process.prefetch_factor is None
 
 
 def test_resumable_batch_sampler_and_trainer_advance_after_boundary_checkpoint(
@@ -127,6 +202,102 @@ def test_resumable_batch_sampler_and_trainer_advance_after_boundary_checkpoint(
     resumed.fit(resumed_loader)
     assert resumed.state.step == 2
     assert resumed.state.epoch == 1
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32" and os.getenv("CI") != "true",
+    reason=(
+        "the managed Windows sandbox denies multiprocessing named pipes; "
+        "Linux CI executes this real multi-worker recovery test"
+    ),
+)
+def test_multiworker_prefetch_checkpoint_tracks_consumed_samples(tmp_path: Path) -> None:
+    rows = [
+        {"x": torch.tensor([float(index), 1.0]), "y": torch.tensor([float(index % 3)])}
+        for index in range(24)
+    ]
+    dataset = _DictBatchDataset(rows)
+    sampler = StatefulRandomSampler(dataset, seed=41)
+    loader: DataLoader[dict[str, torch.Tensor]] = DataLoader(
+        dataset,
+        batch_size=2,
+        sampler=sampler,
+        num_workers=2,
+        prefetch_factor=2,
+    )
+    prefetched_cursors: list[int] = []
+
+    def loss_function(network: torch.nn.Linear, batch: dict[str, torch.Tensor]) -> torch.Tensor:
+        prefetched_cursors.append(sampler.cursor)
+        return _linear_regression_loss(network, batch)
+
+    model = torch.nn.Linear(2, 1)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+    manager = CheckpointManager(tmp_path / "prefetch-checkpoints")
+    config = TrainerConfig(
+        max_steps=4,
+        checkpoint_every_steps=1,
+        log_every_steps=4,
+        num_workers=2,
+        prefetch_factor=2,
+    )
+    trainer: Trainer[torch.nn.Linear, dict[str, torch.Tensor]] = Trainer(
+        model,
+        optimizer,
+        config=config,
+        device="cpu",
+        loss_function=loss_function,
+        checkpoint_manager=manager,
+        data_state_provider=lambda: {"sampler": sampler.state_dict()},
+        data_state_restorer=lambda state: sampler.load_state_dict(state["sampler"]),
+    )
+
+    trainer.fit(loader, max_steps=1)
+
+    assert prefetched_cursors and prefetched_cursors[0] > 2
+    checkpoint = manager.latest()
+    assert checkpoint is not None
+    saved = json.loads((checkpoint / "training_state.json").read_text(encoding="utf-8"))
+    assert saved["data_state"]["sampler"]["cursor"] == 2
+    assert sampler.cursor == 2
+
+    resumed_manager = CheckpointManager(tmp_path / "resumed-prefetch-checkpoints")
+    shutil.copytree(checkpoint, resumed_manager.directory / checkpoint.name)
+    (resumed_manager.directory / "latest.json").write_text(
+        json.dumps({"checkpoint": checkpoint.name, "step": 1}), encoding="utf-8"
+    )
+    trainer.fit(loader)
+    expected_parameters = {
+        name: value.detach().clone() for name, value in trainer.model.state_dict().items()
+    }
+    expected_rng = torch.rand(4)
+
+    resumed_sampler = StatefulRandomSampler(dataset, seed=41)
+    resumed_loader: DataLoader[dict[str, torch.Tensor]] = DataLoader(
+        dataset,
+        batch_size=2,
+        sampler=resumed_sampler,
+        num_workers=2,
+        prefetch_factor=2,
+    )
+    torch.manual_seed(901)
+    resumed_model = torch.nn.Linear(2, 1)
+    resumed_optimizer = torch.optim.SGD(resumed_model.parameters(), lr=0.01)
+    resumed: Trainer[torch.nn.Linear, dict[str, torch.Tensor]] = Trainer(
+        resumed_model,
+        resumed_optimizer,
+        config=config,
+        device="cpu",
+        loss_function=_linear_regression_loss,
+        checkpoint_manager=resumed_manager,
+        data_state_provider=lambda: {"sampler": resumed_sampler.state_dict()},
+        data_state_restorer=lambda state: resumed_sampler.load_state_dict(state["sampler"]),
+    )
+    resumed.restore_checkpoint()
+    resumed.fit(resumed_loader)
+    for name, value in resumed.model.state_dict().items():
+        torch.testing.assert_close(value, expected_parameters[name], rtol=0, atol=0)
+    torch.testing.assert_close(torch.rand(4), expected_rng, rtol=0, atol=0)
 
 
 def test_safe_checkpoint_restores_parameters_optimizer_and_rng(tmp_path: Path) -> None:
@@ -289,13 +460,27 @@ def test_interrupted_training_resumes_with_equivalent_parameters_and_rng(
     assert np.random.random() == expected_rng[2]
 
 
-def test_model_specific_trainers_run_one_synthetic_step_without_release_claims(
+def test_model_specific_trainers_resume_and_evaluate_synthetic_runs(
     tmp_path: Path,
 ) -> None:
     from orion_100m.config import Orion100MConfig
-    from orion_100m.training import RTDTrainingConfig, evaluate_rtd, train_rtd
+    from orion_100m.training import (
+        RTDTrainingConfig,
+        evaluate_rtd,
+        train_rtd,
+    )
+    from orion_100m.training import (
+        _make_training as _make_rtd_training,
+    )
     from orion_300m.config import Orion300MConfig
-    from orion_300m.training import CausalTrainingConfig, evaluate_causal_lm, train_causal_lm
+    from orion_300m.training import (
+        CausalTrainingConfig,
+        evaluate_causal_lm,
+        train_causal_lm,
+    )
+    from orion_300m.training import (
+        _make_training as _make_causal_training,
+    )
 
     ids = [300, 301, 302, 303, 304, 305, 306, 307]
     token_path = tmp_path / "tokens.u16"
@@ -305,7 +490,8 @@ def test_model_specific_trainers_run_one_synthetic_step_without_release_claims(
 
     write_word_id_shard(words_path, [0, 1, 2, 3, 4, 5, 6, 7])
     trainer_config = TrainerConfig(
-        max_steps=1,
+        max_steps=2,
+        gradient_checkpointing=True,
         checkpoint_every_steps=1,
         log_every_steps=1,
     )
@@ -333,11 +519,21 @@ def test_model_specific_trainers_run_one_synthetic_step_without_release_claims(
         generator_intermediate_size=12,
         mask_rate=1.0,
     )
+    rtd_run = tmp_path / "rtd-run"
+    rtd_trainer, rtd_loader, _, _ = _make_rtd_training(
+        token_path, words_path, rtd_run, rtd, device="cpu"
+    )
+    rtd_trainer.fit(rtd_loader, max_steps=1)
     rtd_result = train_rtd(
-        token_path, tmp_path / "rtd-run", rtd, word_ids_path=words_path, device="cpu"
+        token_path,
+        rtd_run,
+        rtd,
+        word_ids_path=words_path,
+        device="cpu",
+        resume=True,
     )
     assert rtd_result["status"] == "training_completed"
-    assert rtd_result["step"] == 1
+    assert rtd_result["step"] == 2
     assert np.isfinite(rtd_result["observed_losses"]).all()
     assert (tmp_path / "rtd-run" / "checkpoints" / "latest.json").is_file()
     heldout_path = tmp_path / "heldout.u16"
@@ -372,9 +568,14 @@ def test_model_specific_trainers_run_one_synthetic_step_without_release_claims(
         learning_rate=1e-3,
         warmup_steps=0,
     )
-    causal_result = train_causal_lm(token_path, tmp_path / "causal-run", causal, device="cpu")
+    causal_run = tmp_path / "causal-run"
+    causal_trainer, causal_loader, _, _ = _make_causal_training(
+        token_path, causal_run, causal, device="cpu"
+    )
+    causal_trainer.fit(causal_loader, max_steps=1)
+    causal_result = train_causal_lm(token_path, causal_run, causal, device="cpu", resume=True)
     assert causal_result["status"] == "training_completed"
-    assert causal_result["step"] == 1
+    assert causal_result["step"] == 2
     assert np.isfinite(causal_result["observed_losses"]).all()
     assert (tmp_path / "causal-run" / "checkpoints" / "latest.json").is_file()
     causal_evaluation = evaluate_causal_lm(

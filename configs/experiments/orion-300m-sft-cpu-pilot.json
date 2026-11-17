@@ -1,0 +1,23 @@
+{
+  "trainer": {
+    "max_steps": 3,
+    "grad_accum_steps": 1,
+    "max_grad_norm": 1.0,
+    "precision": "fp32",
+    "log_every_steps": 1,
+    "checkpoint_every_steps": 3,
+    "checkpoint_dir": "checkpoints/orion-300m-sft",
+    "seed": 1729,
+    "loss_spike_factor": 5.0,
+    "loss_ema_decay": 0.98,
+    "rollback_on_spike": false,
+    "lower_lr_on_rollback": 0.5,
+    "gradient_checkpointing": true
+  },
+  "sequence_length": 2048,
+  "batch_size": 1,
+  "learning_rate": 2e-05,
+  "weight_decay": 0.1,
+  "warmup_steps": 1,
+  "scheduler": "wsd"
+}

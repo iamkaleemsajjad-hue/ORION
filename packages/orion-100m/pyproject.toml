@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "orion-100m"
 version = "0.1.0"
 description = "Independent ORION-100M educational document encoder software"
+readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 dependencies = [

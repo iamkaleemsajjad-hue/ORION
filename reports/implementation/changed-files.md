@@ -1,4 +1,4 @@
-﻿# Changed-file manifest
+# Changed-file manifest
 
 Snapshot date: 2026-11-14. Baseline was clean at the beginning of the audit.
 All entries below are local workspace changes; no commit, push, tag, PR, release, remote update, upload or publication was performed.
@@ -116,3 +116,13 @@ New untracked files before this manifest: 29
 - NEW: `tests/test_preflight.py`
 - NEW: `tests/test_tokenizer_release.py`
 - NEW: ``reports/implementation/changed-files.md`` (this manifest)
+
+
+## Current audit delta (2026-11-15)
+
+The prior delta above is already included in audited baseline commit
+`7d3186c7a0378ef0878a49c524068338af945547`. This audit made documentation and
+report changes only; no package/model implementation source, configuration,
+tests, Git metadata, or user data were modified. The exact current working-tree
+list is generated in `reports/final/CHANGED_FILE_MANIFEST.md`; no commit or push
+was performed.

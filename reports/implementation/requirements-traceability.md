@@ -1,5 +1,7 @@
 # Requirements traceability
 
+> Current audit status is refreshed for revision `7d3186c7a0378ef0878a49c524068338af945547` on 2026-11-15 in [`reports/final/REQUIREMENTS_TRACEABILITY.md`](../final/REQUIREMENTS_TRACEABILITY.md) and its machine-readable companion. This section-level crosswalk is retained as implementation-plan evidence; its older status labels do not imply production data or learned capability verification.
+
 The section numbers refer to the supplied *ORION AI - Technical Implementation
 Plan*. Each row maps the section's principal requirement to source, configuration,
 tests, current state, and evidence. Sub-requirements and unresolved conditions
@@ -16,7 +18,7 @@ Detailed remaining limitations are recorded in the final engineering handover.
 | PLAN-04 | 4 | Document classification, matching, extraction, embeddings, unknown detection | `orion_100m` heads/SDK and `orion_eval` | architecture, evaluation and SDK contract tests; learned predictions need weights | IMPLEMENTED BUT NOT FULLY VERIFIED |
 | PLAN-05 | 5 | Encoder design comparison and decision | architecture decision docs and config | rationale recorded; planned ablations were not run | IMPLEMENTED BUT NOT FULLY VERIFIED |
 | PLAN-06 | 6 | 100M encoder dimensions, attention pattern, initialization and parameter count | `orion_100m.config`, `model.encoder` | `tests/test_architectures.py`, `python tools/count_params.py` | IMPLEMENTED AND VERIFIED |
-| PLAN-07 | 7 | Shared tokenizer contract and stable token IDs | `orion_tokenizer`, core artifact checks | tiny synthetic train/verify/export checks; production map remains provisional and owner-gated | IMPLEMENTED BUT NOT FULLY VERIFIED |
+| PLAN-07 | 7 | Shared tokenizer contract and stable token IDs | `orion_tokenizer`, core artifact checks | tiny synthetic train/verify/export checks; map approved for experimental research; production artifact absent | IMPLEMENTED BUT NOT FULLY VERIFIED |
 | PLAN-08 | 8 | Dataset choices, annotations, source licensing and provenance | `orion_data`, `datasets/manifests`, dataset cards | synthetic manifest and acquisition-policy tests; no corpus included | IMPLEMENTED BUT NOT FULLY VERIFIED |
 | PLAN-09 | 9 | Data refinement, filtering, deduplication, segmentation and shards | `orion_data` pipeline, `prepare`, shard readers/writers | local checksum-pinned JSONL prepare and verify command exercised with synthetic fixtures; corpus scale and real-data leakage remain unmeasured | IMPLEMENTED BUT NOT FULLY VERIFIED |
 | PLAN-10 | 10 | ORION-100M RTD/GDES objective and pretraining | `orion_100m.training`, `orion_train` | loss/gradient tests and one tiny synthetic CPU step | IMPLEMENTED BUT NOT FULLY VERIFIED |
@@ -35,7 +37,7 @@ Detailed remaining limitations are recorded in the final engineering handover.
 | PLAN-23 | 23 | KV cache, streaming, quantization and speed/quality | `orion_300m` generation, export tool | cached/uncached and streaming CPU tests; quantization and benchmarks not validated | IMPLEMENTED BUT NOT FULLY VERIFIED |
 | PLAN-24 | 24 | Byte BPE, 32,768 IDs, reserved IDs, golden behavior | `orion_tokenizer` | synthetic byte/Unicode/Urdu/OCR/code tests and serialization checks; final tokenizer not trained | IMPLEMENTED BUT NOT FULLY VERIFIED |
 | PLAN-25 | 25 | Core blocks, optimizer, configs, checkpoint/recovery, tracking | core/train packages | CPU math, update, integrity and resume-equivalence tests; external tracking is not integrated | PARTIALLY IMPLEMENTED |
-| PLAN-25-DIST | 25 | DDP/FSDP, rank-aware training, and exact distributed recovery | orion_train.distributed, trainer.py, stateful samplers, and checkpoint metadata | Sampler sharding unit test passes; two-process exact-resume test is blocked on this Windows PyTorch Gloo backend; FSDP is not implemented | PARTIALLY IMPLEMENTED |
+| PLAN-25-DIST | 25 | DDP/FSDP, rank-aware training, and exact distributed recovery | orion_train.distributed, trainer.py, stateful samplers, and checkpoint metadata | Rank sharding passes unit tests. Two-process Gloo and two-worker prefetch-resume integration tests are configured for Ubuntu CI but not run here; FSDP is not implemented | PARTIALLY IMPLEMENTED |
 | PLAN-26 | 26 | Hardware and memory feasibility | config/docs and architecture counts | exact counts verified; no GPU, memory, cost or throughput benchmark | IMPLEMENTED BUT NOT FULLY VERIFIED |
 | PLAN-27 | 27 | SDK, CLI, REST schemas, limits and errors | model packages and FastAPI apps | SDK/API tests include ordered generation batches, CLI help/info/config commands; no trained inference artifact | IMPLEMENTED BUT NOT FULLY VERIFIED |
 | PLAN-28 | 28 | Monorepo and independently installable packages | eight package directories and workspace config | all eight wheels build and import from a workspace-local target; isolated dependency-resolving install remains | PARTIALLY IMPLEMENTED |
@@ -50,8 +52,8 @@ Detailed remaining limitations are recorded in the final engineering handover.
 
 ## Cross-cutting remaining requirements
 
-- Tokenizer v1 special-token IDs remain provisional. The owner approval record
-  must be completed before training or freezing v1.0. The training CLI flag is
+- Tokenizer v1's exact digest is approved for experimental research. Production
+  corpus authorization and a trained v1.0 artifact remain pending. The training CLI flag is
   an operator assertion and does not authenticate owner approval.
 - No `uv.lock` is present and `uv` is unavailable. Attempts to install `uv`
   and the required Tokenizers version failed because the configured package
@@ -69,9 +71,10 @@ Detailed remaining limitations are recorded in the final engineering handover.
   and per-rank RNG/data-state recovery are implemented. The sampler sharding
   test passes. The two-process Gloo gradient-sync/resume test is skipped on this
   Windows PyTorch build because it cannot create a Gloo network device. FSDP is
-  not implemented; multi-worker exact recovery is not verified.
-- Latest local checks: pytest 77 passed and 1 platform-specific DDP test was
-  skipped; Ruff lint/format, strict mypy, compileall, model parameter counts,
+  not implemented; multi-worker consumed-cursor recovery is implemented but
+  not verified on a supported process runtime.
+- Latest local checks: pytest 82 passed and 2 platform-specific multiprocessing
+  tests were skipped; Ruff lint/format, strict mypy, compileall, model parameter counts,
   tokenizer/data/preflight synthetic tests and config validation pass.
   PyTorch emits a `pynvml` deprecation warning.
 - The `orion-train info` checkpoint layout mismatch was reproduced, corrected,
@@ -84,11 +87,13 @@ Detailed remaining limitations are recorded in the final engineering handover.
 - `orion preflight` and `orion-data prepare/verify-prepared` now exist.
   Source preflight checks package imports and configuration contracts, but the
   current environment fails its dependency gate because Tokenizers 0.22.2 is
-  installed while the package requires >=0.23.3,<0.24; tokenizer owner
-  approval is also reported pending. The data command is
+  installed while the package requires >=0.23.3,<0.24; token-map approval is recorded for experimental research. The data command is
   verified only on synthetic local fixtures. Clean installation, approved
   corpus preparation, and full authorized training workflows remain unverified.
-- No commit, push, tag, release, upload, or publication was performed.
+- No release, tag, or model/data artifact upload was performed; this verification predates the source-only GitHub publication.
+- Current 2026-11-15 CI hardening adds strict mypy to `.github/workflows/ci.yml`
+  and Ruff security rules to `.github/workflows/security.yml`. Both commands
+  pass locally and workflow YAML parses; GitHub execution remains unverified.
 
 ## Configuration and discrepancy crosswalk
 
@@ -106,7 +111,7 @@ runtime JSON recipe.
 | PLAN-04 | 100M fine-tuning recipes; `configs/evaluation/default.json` | Task APIs/heads exist; classification, calibration and unknown detection quality require trained weights and held-out data. |
 | PLAN-05 | `reports/implementation/decision-records.md` | Candidate reasoning is documented; real ablation results were not run. |
 | PLAN-06 | `configs/pretraining/orion-100m-rtd.json`, `orion_100m.config` | Count and CPU behavior match; initialization quality and planned local/global ablations need training experiments. |
-| PLAN-07 | `configs/tokenizer/byte-bpe-v1.json`, `STATUS.json` | Added explicit owner gate and map digest; the map remains provisional and production tokenizer absent. |
+| PLAN-07 | `configs/tokenizer/byte-bpe-v1.json`, `STATUS.json` | Added explicit owner gate and map digest; the map is approved for experimental research and the production tokenizer is absent. |
 | PLAN-08 | `datasets/manifests/`, `datasets/cards/` | Source records must be created from authorized real sources; none were downloaded. |
 | PLAN-09 | `configs/data/orion-data-preparation.json` | Added `prepare`/`verify-prepared` and checksum/policy checks; pipeline holds records in memory and is not corpus-scale benchmarked. |
 | PLAN-10 | `configs/pretraining/orion-100m-rtd.json` | Synthetic objective/gradient path passes; no RTD pretraining run or scaling evidence exists. |
@@ -116,15 +121,15 @@ runtime JSON recipe.
 | PLAN-14 | `configs/deployment/local-api.json`, 300M generation defaults | Grounding/abstention/citation contracts are tested; generated answers require actual trained weights and host verification. |
 | PLAN-15 | `configs/evaluation/e-300-1-architecture-pilot.json` | Added/runs synthetic candidate framework; production architecture selection awaits fair approved-data experiment. |
 | PLAN-16 | `configs/pretraining/orion-300m-causal.json`, `orion_300m.config` | Exact tied-parameter count and synthetic causal/cache tests pass; quality and target-hardware memory remain unknown. |
-| PLAN-17 | Shared tokenizer recipe and v1 registry | Both models validate shared tokenizer metadata; final ID map requires owner decision. |
+| PLAN-17 | Shared tokenizer recipe and v1 registry | Both models validate shared tokenizer metadata; current map digest is approved for experimental research. |
 | PLAN-18 | Dataset manifests/cards and `configs/pretraining/orion-300m-causal.json` | Provenance interfaces exist; no corpus or instruction data acquired. |
 | PLAN-19 | `configs/data/orion-data-preparation.json`, SFT writer APIs | Local transforms/rendering are tested synthetically; no real corpus/shards produced. |
 | PLAN-20 | `configs/pretraining/orion-300m-causal.json` | Causal loss path executes on tiny synthetic batch; scaling ladder not run. |
 | PLAN-21 | `configs/finetuning/orion-300m-sft.json` | Assistant-only target mask and tiny update pass; no real SFT corpus/model. |
 | PLAN-22 | `configs/evaluation/default.json` | Metrics run on fixtures; acceptance targets are not results. |
 | PLAN-23 | `configs/deployment/local-api.json` and model generation config | KV-cache correctness is tested; GPU, ONNX, quantization and latency claims remain unverified. |
-| PLAN-24 | `configs/tokenizer/byte-bpe-v1.json`, registry, approval and release status | Fixed `Regex` API usage and atomic staged release; final trained 32,768-token v1 is pending approval/data. |
-| PLAN-25 | `TrainerConfig`; model-specific pretraining/fine-tuning recipes | Single-process resume tests pass; external tracking, FSDP and prefetch-exact recovery are not implemented. |
+| PLAN-24 | `configs/tokenizer/byte-bpe-v1.json`, registry, approval and release status | Fixed `Regex` API usage and atomic staged release; trained 32,768-token v1 is pending corpus authorization and training. |
+| PLAN-25 | `TrainerConfig`; model-specific pretraining/fine-tuning recipes | Single-process resume tests pass; external tracking and FSDP are not implemented; worker-prefetch recovery is implemented but awaits Linux execution. |
 | PLAN-25-DIST | `TrainerConfig.distributed_*` fields | DDP code and sampler tests exist; Gloo integration is skipped on Windows. FSDP needs optimizer-builder/checkpoint lifecycle redesign and accelerator verification. |
 | PLAN-26 | Both pretraining configs and hardware docs | Counts are measured; memory/time/cost entries are planning assumptions without target-GPU benchmark. |
 | PLAN-27 | `configs/deployment/local-api.json` and SDK schemas | API/SDK synthetic contracts pass; installed-mode package/entry-point checks await a clean dependency install. |
@@ -135,7 +140,7 @@ runtime JSON recipe.
 | PLAN-32 | `pytest.ini`, root quality config and `.github/workflows/` | Local 77/1 suite and static checks pass; GitHub workflows/security scans were not run. |
 | PLAN-33 | Release metadata and `tools/verify_release.py` | Artifact validation exists; neither model meets trained release gate. |
 | PLAN-34 | Development roadmap and documented CLIs | Milestones/commands are documented; tokenizer/data/model production commands were not invoked. |
-| PLAN-35 | Decision records and tokenizer owner approval record | Owner-controlled token mapping remains pending; architecture pilot choice remains pending real evidence. |
+| PLAN-35 | Decision records and tokenizer owner approval record | Token mapping is approved for experimental research; architecture pilot choice remains pending real evidence. |
 | PLAN-36 | `docs/research/research-ledger.md` | Primary sources and checked dates are recorded; source/API drift is not automatically CI-enforced. |
 
 The `PLAN-11` brace expression above denotes the three separate JSON files

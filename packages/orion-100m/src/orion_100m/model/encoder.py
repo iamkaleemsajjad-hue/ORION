@@ -7,6 +7,7 @@ from typing import cast
 
 import torch
 from torch import nn
+from torch.utils.checkpoint import checkpoint
 
 from orion_100m.config import Orion100MConfig
 from orion_core.blocks.attention import MultiHeadAttention
@@ -81,7 +82,16 @@ class Orion100MEncoder(nn.Module):
             [EncoderBlock(self.config, index) for index in range(self.config.num_layers)]
         )
         self.final_norm = LayerNormNoBias(self.config.hidden_size, eps=self.config.layer_norm_eps)
+        self.gradient_checkpointing = False
         self.reset_parameters()
+
+    def gradient_checkpointing_enable(self) -> None:
+        """Recompute encoder blocks during training to reduce activation storage."""
+        self.gradient_checkpointing = True
+
+    def gradient_checkpointing_disable(self) -> None:
+        """Disable block recomputation without changing model parameters."""
+        self.gradient_checkpointing = False
 
     def reset_parameters(self) -> None:
         """Apply the plan's truncated-normal initialization and residual scaling."""
@@ -146,13 +156,28 @@ class Orion100MEncoder(nn.Module):
             token_embeds = token_embeds.detach()
         hidden = self.embedding_norm(token_embeds)
         hidden_states: list[torch.Tensor] | None = [hidden] if output_hidden_states else None
-        for layer in self.layers:
-            hidden = layer(
-                hidden,
-                attention_mask=attention_mask,
-                position_ids=position_ids,
-                document_ids=document_ids,
-            )
+        for layer in cast(list[EncoderBlock], list(self.layers)):
+            if self.gradient_checkpointing and self.training and torch.is_grad_enabled():
+
+                def run_block(value: torch.Tensor, block: EncoderBlock = layer) -> torch.Tensor:
+                    return cast(
+                        torch.Tensor,
+                        block(
+                            value,
+                            attention_mask=attention_mask,
+                            position_ids=position_ids,
+                            document_ids=document_ids,
+                        ),
+                    )
+
+                hidden = checkpoint(run_block, hidden, use_reentrant=False, preserve_rng_state=True)
+            else:
+                hidden = layer(
+                    hidden,
+                    attention_mask=attention_mask,
+                    position_ids=position_ids,
+                    document_ids=document_ids,
+                )
             if output_hidden_states and hidden_states is not None:
                 hidden_states.append(hidden)
         hidden = self.final_norm(hidden)

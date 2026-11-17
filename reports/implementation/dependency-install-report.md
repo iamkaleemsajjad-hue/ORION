@@ -35,3 +35,29 @@ On a network-enabled environment with the approved package index:
 6. Repeat on the documented CPU platform and separately document CUDA wheels.
 
 No dependency scanner result is implied by this report.
+
+## Follow-up (2026-11-16)
+
+The source audit found that `orion-train` imports Pydantic in its public
+configuration module but relied on `orion-core` to install it transitively.
+`pydantic>=2.7,<3` is now declared directly in
+`packages/orion-train/pyproject.toml`. All eight wheels were rebuilt
+successfully using `pip wheel --no-deps`; the `orion-train` wheel metadata was
+inspected and contains the declared Pydantic requirement. This does not replace
+dependency resolution or clean-install verification. `uv.lock` remains absent
+because `uv` and the configured package index are unavailable in this
+environment.
+
+
+## Current final-pass evidence (2026-11-15)
+
+`Get-Command uv` and the local pip wheel cache still show no uv executable or
+cached uv distribution. A fresh package-index lookup still returns no uv
+distribution. All eight wheels were built with `--no-deps`; this does not
+resolve installation. `pip check` still reports conflicts from unrelated
+global packages and is not an isolated project result. `pip-audit` was
+attempted against the host environment but failed on a refused proxy connection
+to its vulnerability database before it could report findings. A CycloneDX
+1.6 source-declaration inventory is available at
+`reports/final/orion-source-declarations.cdx.json`; no lock-derived release
+SBOM was generated. The clean-install gate remains blocked.

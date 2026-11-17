@@ -26,8 +26,13 @@ network device. This is not a passing DDP runtime result.
   ordinary model parameters. FSDP needs an explicit full or sharded state-dict
   and optimizer-state lifecycle, coordinated across ranks.
 - No CUDA/NCCL or multi-GPU test was possible.
-- Exact resume under DataLoader worker prefetch is not verified; sampler cursor
-  state alone cannot establish that every prefetched batch is replayed exactly.
+- The trainer and stateful samplers now track consumed indices separately from
+  worker-dispatched/prefetched indices, validate ordered worker loading, and
+  rewind unconsumed indices at the end of a fit call. A real two-worker
+  checkpoint/resume equivalence test is configured in Ubuntu CI. It is not
+  verified here because this managed Windows host denies multiprocessing pipe
+  creation; stochastic worker transforms must be stateless per sample for exact
+  replay.
 - Rank failure/restart and elastic world-size changes are not claimed.
 
 On the available PyTorch 2.9.1+cpu installation, constructing
@@ -40,22 +45,11 @@ CPU/Gloo probe failed during process-group setup with
 These are environment limits; they do not establish FSDP behavior on supported
 hardware.
 
-## FSDP environment reproduction
-
-On the available PyTorch 2.9.1+cpu installation, a minimal
-`FullyShardedDataParallel(nn.Linear(2, 2))` construction fails immediately with
-`FSDP needs a non-CPU accelerator device, but no accelerator device is
-detected.` This is direct evidence that this machine cannot perform even a
-minimal FSDP forward/backward/checkpoint test; it does not demonstrate FSDP
-failure on a supported CUDA system.
-
-The current optimizer and checkpoint ownership are also incompatible with a
-simple wrapper toggle. Each model-specific builder creates AdamW and scheduler
-before `Trainer`, while PyTorch requires the optimizer after FSDP wrapping.
-`CheckpointManager` stores ordinary full model state and keys optimizer state
-using parameter object identity/name. FSDP requires an explicit full or
-sharded model/optimizer state lifecycle. These API requirements are described
-in the [official FSDP documentation](https://docs.pytorch.org/docs/main/distributed/fsdp.html).
+These FSDP lifecycle requirements are described in the [official PyTorch FSDP
+documentation](https://docs.pytorch.org/docs/main/distributed/fsdp.html).
+The observed CPU-only FSDP and Gloo probe errors above show that this host
+cannot perform the requested accelerator or Linux runtime verification; they
+do not demonstrate failure on supported hardware.
 
 ## Next action
 
@@ -65,4 +59,5 @@ construction and add a distributed checkpoint format with tested save,
 restore, inference export and optimizer-state resharding. Official PyTorch
 documentation describes the separate state-dict APIs and parameter lifecycle;
 the local CPU-only runtime cannot validate an accelerator FSDP run. Until those
-checks pass, report DDP as partially verified and FSDP as not implemented.
+checks pass, report DDP and worker-prefetch recovery as implemented but not
+runtime-verified, and FSDP as not implemented.

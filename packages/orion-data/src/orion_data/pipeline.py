@@ -111,7 +111,8 @@ def synthesize_ocr_noise(text: str, *, cer: float, seed: int) -> str:
         raise ValueError("cer must lie in [0, 1]")
     import random
 
-    rng = random.Random(seed)
+    # Seeded pseudorandomness makes synthetic OCR corruption reproducible; it is not security-sensitive.
+    rng = random.Random(seed)  # noqa: S311
     output: list[str] = []
     for char in text:
         if rng.random() < cer:

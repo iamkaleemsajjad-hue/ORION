@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import random
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import Any, Generic, TypeVar, cast
@@ -86,6 +86,34 @@ def _tuple_tree(value: Any) -> Any:
     return value
 
 
+def _batch_sample_count(batch: Any, fallback: int | None) -> int:
+    """Infer the batch-leading sample count used to acknowledge prefetched indices."""
+    if isinstance(batch, torch.Tensor):
+        if batch.ndim > 0:
+            return int(batch.shape[0])
+    elif isinstance(batch, Mapping):
+        for key in ("input_ids", "source_ids", "document_ids", "x"):
+            if key in batch:
+                try:
+                    return _batch_sample_count(batch[key], fallback=None)
+                except ValueError:
+                    continue
+        for value in batch.values():
+            try:
+                return _batch_sample_count(value, fallback=None)
+            except ValueError:
+                continue
+    elif isinstance(batch, tuple | list):
+        for value in batch:
+            try:
+                return _batch_sample_count(value, fallback=None)
+            except ValueError:
+                continue
+    if fallback is not None and fallback > 0:
+        return fallback
+    raise ValueError("cannot infer consumed samples from the DataLoader batch")
+
+
 class Trainer(Generic[ModelT, BatchT]):
     """Gradient accumulation, autocast, clipping, logging, and periodic checkpoints."""
 
@@ -114,6 +142,18 @@ class Trainer(Generic[ModelT, BatchT]):
             self.device = select_device(device)
         self.precision_dtype = autocast_dtype(config.precision, self.device)
         self.model = model.to(self.device)
+        if config.gradient_checkpointing:
+            method_name = "gradient_checkpointing_enable"
+            enabled_modules = 0
+            for module in self.model.modules():
+                enable = getattr(module, method_name, None)
+                if callable(enable):
+                    enable()
+                    enabled_modules += 1
+            if enabled_modules == 0:
+                raise ValueError(
+                    "gradient_checkpointing is enabled but the model has no checkpointable blocks"
+                )
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.config = config
@@ -150,11 +190,14 @@ class Trainer(Generic[ModelT, BatchT]):
         self.optimizer.zero_grad(set_to_none=True)
         losses: list[float] = []
         accumulated = 0
+        step_loss_total = 0.0
+        step_microbatches = 0
         while self.state.step < step_limit:
             saw_batch = False
             epoch_complete = True
             for raw_batch in self._iterate(data_loader):
                 saw_batch = True
+                self._acknowledge_data_batch(data_loader, raw_batch)
                 batch = cast(BatchT, _move_to_device(raw_batch, self.device))
                 synchronize_now = accumulated + 1 >= self.config.grad_accum_steps
                 sync_context = (
@@ -181,9 +224,12 @@ class Trainer(Generic[ModelT, BatchT]):
                     torch.autograd.backward(self.scaler.scale(scaled_loss))
                 accumulated += 1
                 value, token_count = self._reduce_step_metrics(loss, _count_tokens(batch))
+                step_loss_total += value
+                step_microbatches += 1
                 self.state.tokens_seen += token_count
                 if accumulated < self.config.grad_accum_steps:
                     continue
+                value = step_loss_total / step_microbatches
                 self.scaler.unscale_(self.optimizer)
                 grad_norm = torch.nn.utils.clip_grad_norm_(
                     self.model.parameters(), self.config.max_grad_norm, error_if_nonfinite=True
@@ -199,6 +245,8 @@ class Trainer(Generic[ModelT, BatchT]):
                     self.scheduler.step()
                 self.optimizer.zero_grad(set_to_none=True)
                 accumulated = 0
+                step_loss_total = 0.0
+                step_microbatches = 0
                 self.state.step += 1
                 losses.append(value)
                 self._update_loss_ema(value)
@@ -240,15 +288,32 @@ class Trainer(Generic[ModelT, BatchT]):
                 if parameter.grad is not None:
                     parameter.grad.mul_(factor)
             self.scaler.unscale_(self.optimizer)
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.config.max_grad_norm)
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                self.model.parameters(), self.config.max_grad_norm, error_if_nonfinite=True
+            )
             self.scaler.step(self.optimizer)
             self.scaler.update()
             if self.scheduler is not None:
                 self.scheduler.step()
             self.optimizer.zero_grad(set_to_none=True)
             self.state.step += 1
-            if losses:
-                losses[-1] = float(losses[-1])
+            value = step_loss_total / step_microbatches
+            losses.append(value)
+            self._update_loss_ema(value)
+            if self.state.step % self.config.log_every_steps == 0 and self._is_primary:
+                logger.info(
+                    "step=%d loss=%.6f grad_norm=%.5f tokens_seen=%d",
+                    self.state.step,
+                    value,
+                    float(grad_norm.detach().float().cpu()),
+                    self.state.tokens_seen,
+                )
+            if (
+                self.checkpoint_manager is not None
+                and self.state.step % self.config.checkpoint_every_steps == 0
+            ):
+                self.save_checkpoint()
+        self._rewind_prefetched_data(data_loader)
         return losses
 
     def evaluate(self, data_loader: Iterable[BatchT], *, max_batches: int | None = None) -> float:
@@ -442,31 +507,93 @@ class Trainer(Generic[ModelT, BatchT]):
 
     def _configure_data_sampler(self, data_loader: Iterable[BatchT]) -> None:
         context = self.distributed_context
-        if context is None:
-            return
         candidates = [
             getattr(data_loader, "sampler", None),
             getattr(data_loader, "batch_sampler", None),
         ]
-        configured = False
-        for sampler in candidates:
-            configure = getattr(sampler, "configure_distributed", None)
-            if callable(configure):
-                configure(context.rank, context.world_size)
-                configured = True
-        if not configured:
-            raise ValueError(
-                "DDP training requires an ORION stateful sampler that can shard data by rank"
-            )
+        if context is not None:
+            configured = False
+            for sampler in candidates:
+                configure = getattr(sampler, "configure_distributed", None)
+                if callable(configure):
+                    configure(context.rank, context.world_size)
+                    configured = True
+            if not configured:
+                raise ValueError(
+                    "DDP training requires an ORION stateful sampler that can shard data by rank"
+                )
+
+        if isinstance(data_loader, DataLoader):
+            if data_loader.num_workers != self.config.num_workers:
+                raise ValueError(
+                    "TrainerConfig.num_workers does not match the configured DataLoader"
+                )
+            if data_loader.num_workers > 0:
+                if getattr(data_loader, "in_order", True) is False:
+                    raise ValueError("resumable multi-worker training requires in_order=True")
+                if data_loader.prefetch_factor != self.config.prefetch_factor:
+                    raise ValueError(
+                        "TrainerConfig.prefetch_factor does not match the configured DataLoader"
+                    )
+                if data_loader.persistent_workers != self.config.persistent_workers:
+                    raise ValueError(
+                        "TrainerConfig.persistent_workers does not match the configured DataLoader"
+                    )
+                acknowledged = 0
+                for sampler in candidates:
+                    enable = getattr(sampler, "enable_acknowledged_cursor", None)
+                    if callable(enable):
+                        enable()
+                        acknowledged += 1
+                if acknowledged == 0:
+                    raise ValueError(
+                        "resumable multi-worker training requires an ORION stateful sampler"
+                    )
+        elif self.config.num_workers > 0:
+            raise ValueError("configured data-loader workers require a PyTorch DataLoader")
+
+    @staticmethod
+    def _stateful_samplers(data_loader: Iterable[BatchT]) -> list[Any]:
+        found: list[Any] = []
+        seen: set[int] = set()
+        for sampler in (
+            getattr(data_loader, "sampler", None),
+            getattr(data_loader, "batch_sampler", None),
+        ):
+            if sampler is not None and id(sampler) not in seen:
+                found.append(sampler)
+                seen.add(id(sampler))
+        return found
+
+    def _acknowledge_data_batch(self, data_loader: Iterable[BatchT], batch: Any) -> None:
+        if not isinstance(data_loader, DataLoader) or data_loader.num_workers == 0:
+            return
+        sample_count = _batch_sample_count(batch, data_loader.batch_size)
+        acknowledged = 0
+        for sampler in self._stateful_samplers(data_loader):
+            acknowledge = getattr(sampler, "acknowledge", None)
+            if callable(acknowledge):
+                acknowledge(sample_count)
+                acknowledged += 1
+        if acknowledged == 0:
+            raise RuntimeError("multi-worker sampler lost its acknowledged-cursor support")
+
+    def _rewind_prefetched_data(self, data_loader: Iterable[BatchT]) -> None:
+        for sampler in self._stateful_samplers(data_loader):
+            rewind = getattr(sampler, "rewind_unconsumed", None)
+            if callable(rewind):
+                rewind()
 
     @staticmethod
     def _iterate(data_loader: Iterable[BatchT]) -> Iterable[BatchT]:
-        # DataLoader iterator creation draws a base seed from the global CPU RNG
-        # when no generator is supplied. That would shift dropout after resume.
-        if isinstance(data_loader, DataLoader) and data_loader.num_workers == 0:
+        # Iterator creation draws a worker base seed from the global CPU RNG. Keep
+        # that loader detail separate from the model RNG recorded for recovery.
+        if isinstance(data_loader, DataLoader):
             rng_state = torch.get_rng_state()
-            iterator = iter(data_loader)
-            torch.set_rng_state(rng_state)
+            try:
+                iterator = iter(data_loader)
+            finally:
+                torch.set_rng_state(rng_state)
             return cast(Iterable[BatchT], iterator)
         return data_loader
 

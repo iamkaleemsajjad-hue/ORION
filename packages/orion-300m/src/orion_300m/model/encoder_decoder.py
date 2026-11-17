@@ -8,6 +8,7 @@ from typing import cast
 import torch
 from torch import nn
 from torch.nn import functional as F
+from torch.utils.checkpoint import checkpoint
 
 from orion_300m.config import Orion300MConfig
 from orion_core.blocks.attention import MultiHeadAttention
@@ -211,7 +212,16 @@ class Orion300MEncoderDecoderPilot(nn.Module):
         self.decoder_norm = RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
         self.lm_head.weight = self.token_embeddings.weight
+        self.gradient_checkpointing = False
         self.reset_parameters()
+
+    def gradient_checkpointing_enable(self) -> None:
+        """Recompute pilot transformer blocks during training."""
+        self.gradient_checkpointing = True
+
+    def gradient_checkpointing_disable(self) -> None:
+        """Disable pilot block recomputation."""
+        self.gradient_checkpointing = False
 
     def reset_parameters(self) -> None:
         """Initialize the pilot from scratch and scale residual projections."""
@@ -286,22 +296,66 @@ class Orion300MEncoderDecoderPilot(nn.Module):
             batch, -1
         )
         memory = self.token_embeddings(source_ids)
-        for layer in self.encoder:
-            memory = layer(
-                memory,
-                attention_mask=source_attention_mask,
-                position_ids=source_positions,
-            )
+        for encoder_layer in cast(list[EncoderBlock], list(self.encoder)):
+            if self.gradient_checkpointing and self.training and torch.is_grad_enabled():
+
+                def run_encoder_block(
+                    value: torch.Tensor, block: EncoderBlock = encoder_layer
+                ) -> torch.Tensor:
+                    return cast(
+                        torch.Tensor,
+                        block(
+                            value,
+                            attention_mask=source_attention_mask,
+                            position_ids=source_positions,
+                        ),
+                    )
+
+                memory = checkpoint(
+                    run_encoder_block, memory, use_reentrant=False, preserve_rng_state=True
+                )
+            else:
+                memory = encoder_layer(
+                    memory,
+                    attention_mask=source_attention_mask,
+                    position_ids=source_positions,
+                )
         memory = self.encoder_norm(memory)
         hidden = self.token_embeddings(decoder_input_ids)
-        for layer in self.decoder:
-            hidden = layer(
-                hidden,
-                memory,
-                target_attention_mask=target_attention_mask,
-                source_attention_mask=source_attention_mask,
-                position_ids=target_positions,
-            )
+        for decoder_layer in cast(list[DecoderBlock], list(self.decoder)):
+            if self.gradient_checkpointing and self.training and torch.is_grad_enabled():
+
+                def run_decoder_block(
+                    value: torch.Tensor,
+                    encoded: torch.Tensor,
+                    block: DecoderBlock = decoder_layer,
+                ) -> torch.Tensor:
+                    return cast(
+                        torch.Tensor,
+                        block(
+                            value,
+                            encoded,
+                            target_attention_mask=target_attention_mask,
+                            source_attention_mask=source_attention_mask,
+                            position_ids=target_positions,
+                        ),
+                    )
+
+                hidden = checkpoint(
+                    run_decoder_block,
+                    hidden,
+                    memory,
+                    use_reentrant=False,
+                    preserve_rng_state=True,
+                )
+            else:
+                hidden = decoder_layer(
+                    hidden,
+                    memory,
+                    target_attention_mask=target_attention_mask,
+                    source_attention_mask=source_attention_mask,
+                    position_ids=target_positions,
+                )
         hidden = self.decoder_norm(hidden)
         logits = F.linear(hidden, self.token_embeddings.weight)
         loss = z_loss = None

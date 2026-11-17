@@ -36,3 +36,9 @@ def test_model_packages_do_not_depend_on_each_other_or_madad() -> None:
         assert all(name not in dependencies for name in forbidden)
         for source in (root / "src").rglob("*.py"):
             assert _imports(source).isdisjoint({name.replace("-", "_") for name in forbidden})
+
+
+def test_training_distribution_declares_its_direct_configuration_dependency() -> None:
+    metadata = (ROOT / "packages/orion-train/pyproject.toml").read_text(encoding="utf-8")
+    runtime_project = metadata.split("[project.optional-dependencies]", maxsplit=1)[0]
+    assert '"pydantic>=2.7,<3"' in runtime_project

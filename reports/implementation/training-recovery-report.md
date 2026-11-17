@@ -18,7 +18,10 @@ single-process execution. No production checkpoint was created.
 Verified exact recovery is limited to tested single-process synthetic runs and
 their captured model/optimizer/scheduler/scaler/RNG/sampler/config state.
 Distributed recovery is partially implemented but lacks a successful
-multi-process runtime test here. DataLoader prefetch recovery, FSDP state,
+multi-process runtime test here. DataLoader prefetch recovery has now been
+implemented with acknowledged sampler cursors and covered by a real
+two-worker resume-equivalence test configured for Ubuntu CI; it could not run
+on the restricted Windows host. FSDP state,
 CUDA/NCCL, storage interruption under real concurrent writers, and large
 checkpoint throughput remain unverified.
 

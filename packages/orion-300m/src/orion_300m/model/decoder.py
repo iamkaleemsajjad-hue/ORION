@@ -8,6 +8,7 @@ from typing import cast
 import torch
 from torch import nn
 from torch.nn import functional as F
+from torch.utils.checkpoint import checkpoint
 
 from orion_300m.config import Orion300MConfig
 from orion_core.blocks.attention import KeyValue, MultiHeadAttention, StaticKVCache
@@ -93,7 +94,16 @@ class Orion300MDecoder(nn.Module):
         self.final_norm = RMSNorm(self.config.hidden_size, eps=self.config.rms_norm_eps)
         self.lm_head = nn.Linear(self.config.hidden_size, self.config.vocab_size, bias=False)
         self.lm_head.weight = self.token_embeddings.weight
+        self.gradient_checkpointing = False
         self.reset_parameters()
+
+    def gradient_checkpointing_enable(self) -> None:
+        """Recompute decoder blocks during training to reduce activation storage."""
+        self.gradient_checkpointing = True
+
+    def gradient_checkpointing_disable(self) -> None:
+        """Disable decoder block recomputation."""
+        self.gradient_checkpointing = False
 
     def reset_parameters(self) -> None:
         """Use truncated-normal initialization and scale residual output projections."""
@@ -146,6 +156,9 @@ class Orion300MDecoder(nn.Module):
             raise InputLimitError(
                 f"Prompt and cache contain {total_length} tokens; context limit is {self.config.context_length}"
             )
+        checkpointing = self.gradient_checkpointing and self.training and torch.is_grad_enabled()
+        if checkpointing and (cache is not None or past_key_values is not None or use_cache):
+            raise ValueError("gradient checkpointing cannot be combined with a KV cache")
         if use_cache and cache is None and past_key_values is None:
             cache = StaticKVCache(self.config.num_layers, batch, self.config.context_length)
         if attention_mask is None:
@@ -188,19 +201,42 @@ class Orion300MDecoder(nn.Module):
         hidden = self.token_embeddings(input_ids)
         hidden_states: list[torch.Tensor] | None = [hidden] if output_hidden_states else None
         presents = []
-        for layer_index, layer in enumerate(self.layers):
+        for layer_index, layer in enumerate(cast(list[DecoderBlock], list(self.layers))):
             past = past_key_values[layer_index] if past_key_values is not None else None
-            hidden, present = layer(
-                hidden,
-                attention_mask=layer_attention_mask,
-                position_ids=position_ids,
-                layer_index=layer_index,
-                cache=cache,
-                cache_position=past_length,
-                past_key_value=past,
-                use_cache=use_cache and cache is None,
-                causal_override=causal_override,
-            )
+            if checkpointing:
+
+                def run_block(
+                    value: torch.Tensor,
+                    block: DecoderBlock = layer,
+                    current_layer_index: int = layer_index,
+                ) -> torch.Tensor:
+                    output, _ = block(
+                        value,
+                        attention_mask=layer_attention_mask,
+                        position_ids=position_ids,
+                        layer_index=current_layer_index,
+                        cache=None,
+                        cache_position=past_length,
+                        past_key_value=None,
+                        use_cache=False,
+                        causal_override=causal_override,
+                    )
+                    return cast(torch.Tensor, output)
+
+                hidden = checkpoint(run_block, hidden, use_reentrant=False, preserve_rng_state=True)
+                present = None
+            else:
+                hidden, present = layer(
+                    hidden,
+                    attention_mask=layer_attention_mask,
+                    position_ids=position_ids,
+                    layer_index=layer_index,
+                    cache=cache,
+                    cache_position=past_length,
+                    past_key_value=past,
+                    use_cache=use_cache and cache is None,
+                    causal_override=causal_override,
+                )
             if present is not None:
                 presents.append(present)
             if output_hidden_states and hidden_states is not None:

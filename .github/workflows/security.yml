@@ -21,6 +21,8 @@ jobs:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@v7
       - run: uv sync --all-packages --group dev
+      - name: Run Ruff security rules
+        run: uv run ruff check --select S packages tools
       - name: Audit installed Python dependencies
         run: uv run --with pip-audit pip-audit --skip-editable
       - name: Check for pickle-based model loading

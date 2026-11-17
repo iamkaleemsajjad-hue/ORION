@@ -195,6 +195,14 @@ def main(argv: list[str] | None = None) -> int:
                 )
             _emit(evaluation_result)
             return 0
+        if args.command == "info":
+            _emit(Orion300M.model_info())
+            return 0
+
+        if args.command == "health":
+            _emit(Orion300M.load().health())
+            return 0
+
         if args.command == "serve":
             import uvicorn
 

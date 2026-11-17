@@ -9,7 +9,42 @@ from typing import Any
 from torch.utils.data import Sampler
 
 
-class StatefulRandomSampler(Sampler[int]):
+class _AcknowledgedCursor:
+    """Separate dispatched sampler position from batches consumed by the trainer."""
+
+    cursor: int
+    _consumed_cursor: int | None
+
+    def enable_acknowledged_cursor(self) -> None:
+        """Make checkpoint state track consumed samples rather than worker prefetch."""
+        if self._consumed_cursor is None:
+            self._consumed_cursor = self.cursor
+
+    def acknowledge(self, sample_count: int) -> None:
+        """Commit a batch only after its data has been returned to the training loop."""
+        if self._consumed_cursor is None:
+            raise RuntimeError("acknowledged cursor mode has not been enabled")
+        if sample_count <= 0:
+            raise ValueError("sample_count must be positive")
+        next_cursor = self._consumed_cursor + sample_count
+        if next_cursor > self.cursor:
+            raise ValueError("cannot acknowledge samples that have not been dispatched")
+        self._consumed_cursor = next_cursor
+
+    def rewind_unconsumed(self) -> None:
+        """Allow a new DataLoader iterator to replay prefetched but unused indices."""
+        if self._consumed_cursor is not None:
+            self.cursor = self._consumed_cursor
+
+    def _set_restored_cursor(self, cursor: int, *, acknowledged: bool) -> None:
+        self.cursor = cursor
+        self._consumed_cursor = cursor if acknowledged else None
+
+    def _cursor_for_state(self) -> int:
+        return self.cursor if self._consumed_cursor is None else self._consumed_cursor
+
+
+class StatefulRandomSampler(_AcknowledgedCursor, Sampler[int]):
     """Epoch-wise permutation sampler whose state can be saved as JSON values."""
 
     def __init__(self, data_source: Sized, *, seed: int = 1729) -> None:
@@ -23,16 +58,20 @@ class StatefulRandomSampler(Sampler[int]):
         self.world_size = 1
         self._local_size = self.size
         self._indices: list[int] = []
+        self._consumed_cursor: int | None = None
         self._make_order()
 
     def _make_order(self) -> None:
-        generator = random.Random(self.seed + self.epoch)
+        # Deterministic data ordering is reproducibility state, not cryptography.
+        generator = random.Random(self.seed + self.epoch)  # noqa: S311
         self._indices = list(range(self.size))
         generator.shuffle(self._indices)
         usable_size = self.size - (self.size % self.world_size)
         self._indices = self._indices[self.rank : usable_size : self.world_size]
         self._local_size = len(self._indices)
         self.cursor = 0
+        if self._consumed_cursor is not None:
+            self._consumed_cursor = 0
 
     def configure_distributed(self, rank: int, world_size: int) -> None:
         """Shard one deterministic global permutation evenly across DDP ranks."""
@@ -66,7 +105,8 @@ class StatefulRandomSampler(Sampler[int]):
             "size": self.size,
             "seed": self.seed,
             "epoch": self.epoch,
-            "cursor": self.cursor,
+            "cursor": self._cursor_for_state(),
+            "acknowledged_cursor": self._consumed_cursor is not None,
             "rank": self.rank,
             "world_size": self.world_size,
         }
@@ -78,14 +118,17 @@ class StatefulRandomSampler(Sampler[int]):
         if (rank, world_size) != (self.rank, self.world_size):
             raise ValueError("sampler state does not match distributed rank and world size")
         epoch, cursor = int(state["epoch"]), int(state["cursor"])
+        acknowledged = state.get("acknowledged_cursor", False)
+        if not isinstance(acknowledged, bool):
+            raise ValueError("invalid acknowledged-cursor state")
         if epoch < 0 or not 0 <= cursor <= self._local_size:
             raise ValueError("invalid sampler epoch or cursor")
         self.epoch = epoch
         self._make_order()
-        self.cursor = cursor
+        self._set_restored_cursor(cursor, acknowledged=acknowledged)
 
 
-class StatefulRandomBatchSampler(Sampler[list[int]]):
+class StatefulRandomBatchSampler(_AcknowledgedCursor, Sampler[list[int]]):
     """Batch-level resumable permutation that drops only incomplete epoch tails."""
 
     def __init__(self, data_source: Sized, *, batch_size: int, seed: int = 1729) -> None:
@@ -103,16 +146,20 @@ class StatefulRandomBatchSampler(Sampler[list[int]]):
         self.world_size = 1
         self._local_size = self.usable_size
         self._indices: list[int] = []
+        self._consumed_cursor: int | None = None
         self._make_order()
 
     def _make_order(self) -> None:
-        generator = random.Random(self.seed + self.epoch)
+        # Deterministic data ordering is reproducibility state, not cryptography.
+        generator = random.Random(self.seed + self.epoch)  # noqa: S311
         self._indices = list(range(self.size))
         generator.shuffle(self._indices)
         global_usable_size = self.size - (self.size % (self.batch_size * self.world_size))
         self._indices = self._indices[self.rank : global_usable_size : self.world_size]
         self._local_size = len(self._indices)
         self.cursor = 0
+        if self._consumed_cursor is not None:
+            self._consumed_cursor = 0
 
     def configure_distributed(self, rank: int, world_size: int) -> None:
         """Shard samples so every rank yields the same number of full local batches."""
@@ -147,7 +194,8 @@ class StatefulRandomBatchSampler(Sampler[list[int]]):
             "batch_size": self.batch_size,
             "seed": self.seed,
             "epoch": self.epoch,
-            "cursor": self.cursor,
+            "cursor": self._cursor_for_state(),
+            "acknowledged_cursor": self._consumed_cursor is not None,
             "rank": self.rank,
             "world_size": self.world_size,
         }
@@ -163,8 +211,11 @@ class StatefulRandomBatchSampler(Sampler[list[int]]):
         if (rank, world_size) != (self.rank, self.world_size):
             raise ValueError("batch sampler state does not match distributed rank and world size")
         epoch, cursor = int(state["epoch"]), int(state["cursor"])
+        acknowledged = state.get("acknowledged_cursor", False)
+        if not isinstance(acknowledged, bool):
+            raise ValueError("invalid acknowledged-cursor state")
         if epoch < 0 or not 0 <= cursor <= self._local_size or cursor % self.batch_size:
             raise ValueError("invalid batch sampler epoch or cursor")
         self.epoch = epoch
         self._make_order()
-        self.cursor = cursor
+        self._set_restored_cursor(cursor, acknowledged=acknowledged)

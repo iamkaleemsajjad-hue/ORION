@@ -316,18 +316,23 @@ def run_architecture_pilot(
         ) -> None:
             current_sampler.load_state_dict(state["sampler"])
 
+        loader_options = config.trainer.data_loader_options
         training_loader = DataLoader(
             train_set,
             batch_size=config.batch_size,
             sampler=sampler,
-            num_workers=0,
+            num_workers=loader_options.num_workers,
+            prefetch_factor=loader_options.prefetch_factor,
+            persistent_workers=loader_options.persistent_workers,
             collate_fn=collate,
         )
         validation_loader = DataLoader(
             validation_set,
             batch_size=config.batch_size,
             shuffle=False,
-            num_workers=0,
+            num_workers=loader_options.num_workers,
+            prefetch_factor=loader_options.prefetch_factor,
+            persistent_workers=loader_options.persistent_workers,
             collate_fn=collate,
         )
         model = _model_for_candidate(candidate, config)

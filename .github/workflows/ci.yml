@@ -10,6 +10,24 @@ permissions:
   contents: read
 
 jobs:
+  multiprocess-recovery:
+    runs-on: ubuntu-latest
+    env:
+      ORION_REQUIRE_GLOO: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v7
+      - name: Resolve and install all workspace packages
+        run: uv sync --all-packages --group dev
+      - name: Verify real multi-worker and two-process CPU recovery
+        run: >-
+          uv run pytest -q
+          tests/test_training_data.py::test_multiworker_prefetch_checkpoint_tracks_consumed_samples
+          tests/test_distributed_training.py::test_ddp_gradient_sync_and_exact_rank_state_resume
+
   quality-and-tests:
     strategy:
       fail-fast: false
@@ -27,6 +45,8 @@ jobs:
         run: uv sync --all-packages --group dev
       - name: Compile source
         run: uv run python -m compileall -q packages tests tools
+      - name: Strict type checking
+        run: uv run mypy packages tests tools --show-error-codes
       - name: Lint
         run: uv run ruff check .
       - name: Formatting

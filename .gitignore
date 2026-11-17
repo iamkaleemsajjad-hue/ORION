@@ -16,15 +16,46 @@ checkpoints/**
 !checkpoints/.gitkeep
 artifacts/**
 !artifacts/.gitkeep
-datasets/raw/
-datasets/processed/
-datasets/cache/
+# Keep dataset documentation and the checked-in synthetic example manifest;
+# ignore local manifests, downloads, and generated/prepared dataset contents.
+/datasets/**
+!/datasets/README.md
+!/datasets/cards/
+!/datasets/cards/**
+!/datasets/manifests/
+/datasets/manifests/*
+!/datasets/manifests/synthetic-example.json
+/data/**
+/models/**
+**/weights/**
+**/model_weights/**
+**/saved_model/**
+**/checkpoints/**
 *.safetensors
+*.safetensors.index.json
 *.onnx
 *.gguf
 *.bin
+*.pt
+*.pth
+*.ckpt
+*.model
+*.msgpack
+*.pb
+*.h5
+*.hdf5
+*.tflite
+*.weights
+*.pkl
+*.pickle
+*.npy
+*.npz
 *.memmap
 *.idx
+*.parquet
+*.arrow
+*.tfrecord
+*.tfrecords
 
 # Local run output and credentials
 logs/
@@ -39,3 +70,4 @@ logs/
 Thumbs.db
 .idea/
 .vscode/
+*.bak

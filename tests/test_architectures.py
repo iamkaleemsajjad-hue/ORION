@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from typing import cast
 
 import pytest
@@ -67,6 +68,33 @@ def test_encoder_forward_backward_and_padding_isolation() -> None:
     )
     torch.testing.assert_close(short.pooled_output, padded.pooled_output)
     torch.testing.assert_close(short.last_hidden_state, padded.last_hidden_state[:, :3])
+
+
+def test_encoder_activation_checkpointing_preserves_dropout_outputs_and_gradients() -> None:
+    config = _small_encoder_config().model_copy(update={"dropout": 0.15})
+    torch.manual_seed(111)
+    reference = Orion100MEncoder(config).train()
+    checkpointed = copy.deepcopy(reference).train()
+    checkpointed.gradient_checkpointing_enable()
+    ids = torch.tensor([[2, 300, 301, 302]])
+    mask = ids.ne(0)
+
+    torch.manual_seed(222)
+    reference_output = reference(ids, attention_mask=mask)
+    reference_output.pooled_output.square().mean().backward()
+    expected_rng = torch.get_rng_state()
+
+    torch.manual_seed(222)
+    checkpointed_output = checkpointed(ids, attention_mask=mask)
+    checkpointed_output.pooled_output.square().mean().backward()
+
+    torch.testing.assert_close(
+        checkpointed_output.last_hidden_state, reference_output.last_hidden_state
+    )
+    torch.testing.assert_close(torch.get_rng_state(), expected_rng, rtol=0, atol=0)
+    for expected, actual in zip(reference.parameters(), checkpointed.parameters(), strict=True):
+        assert expected.grad is not None and actual.grad is not None
+        torch.testing.assert_close(actual.grad, expected.grad, rtol=1e-6, atol=1e-7)
 
 
 def test_rotary_embedding_matches_pairwise_rotation() -> None:
@@ -148,6 +176,36 @@ def test_decoder_causal_mask_cache_equivalence_and_backward() -> None:
     assert model.lm_head.weight is model.token_embeddings.weight
 
 
+def test_decoder_activation_checkpointing_preserves_gradients_and_rejects_kv_cache() -> None:
+    config = _small_decoder_config().model_copy(update={"dropout": 0.15})
+    torch.manual_seed(333)
+    reference = Orion300MDecoder(config).train()
+    checkpointed = copy.deepcopy(reference).train()
+    checkpointed.gradient_checkpointing_enable()
+    ids = torch.tensor([[5, 300, 301, 302]])
+
+    torch.manual_seed(444)
+    reference_output = reference(ids, labels=ids)
+    assert reference_output.loss is not None
+    reference_output.loss.backward()
+    expected_rng = torch.get_rng_state()
+
+    torch.manual_seed(444)
+    checkpointed_output = checkpointed(ids, labels=ids)
+    assert checkpointed_output.loss is not None
+    checkpointed_output.loss.backward()
+
+    torch.testing.assert_close(checkpointed_output.logits, reference_output.logits)
+    torch.testing.assert_close(torch.get_rng_state(), expected_rng, rtol=0, atol=0)
+    for expected, actual in zip(reference.parameters(), checkpointed.parameters(), strict=True):
+        assert expected.grad is not None and actual.grad is not None
+        torch.testing.assert_close(actual.grad, expected.grad, rtol=1e-6, atol=1e-7)
+    with pytest.raises(ValueError, match="cannot be combined with a KV cache"):
+        checkpointed(ids, use_cache=True)
+    checkpointed.eval()
+    assert checkpointed(ids, use_cache=True).cache is not None
+
+
 def test_prefix_lm_allows_bidirectional_prefix_and_causal_targets() -> None:
     torch.manual_seed(31)
     model = Orion300MDecoder(_small_decoder_config()).eval()
@@ -173,12 +231,21 @@ def test_prefix_lm_allows_bidirectional_prefix_and_causal_targets() -> None:
 def test_encoder_decoder_pilot_cross_attention_forward_and_backward() -> None:
     torch.manual_seed(37)
     config = _small_decoder_config()
-    model = Orion300MEncoderDecoderPilot(config, encoder_layers=1, decoder_layers=1)
+    reference = Orion300MEncoderDecoderPilot(config, encoder_layers=1, decoder_layers=1)
+    model = copy.deepcopy(reference)
+    model.gradient_checkpointing_enable()
     source = torch.tensor([[5, 300, 0]])
     source_mask = source.ne(0)
     decoder_input = torch.tensor([[5, 301, 0]])
     target_mask = decoder_input.ne(0)
     labels = torch.tensor([[301, 6, -100]])
+    reference_output = reference(
+        source,
+        decoder_input,
+        source_attention_mask=source_mask,
+        target_attention_mask=target_mask,
+        labels=labels,
+    )
     output = model(
         source,
         decoder_input,
@@ -189,8 +256,14 @@ def test_encoder_decoder_pilot_cross_attention_forward_and_backward() -> None:
     assert output.encoder_last_hidden_state.shape == (1, 3, config.hidden_size)
     assert output.logits.shape == (1, 3, config.vocab_size)
     assert output.loss is not None and torch.isfinite(output.loss)
+    assert reference_output.loss is not None
+    torch.testing.assert_close(output.logits, reference_output.logits)
     output.loss.backward()
+    reference_output.loss.backward()
     assert model.token_embeddings.weight.grad is not None
     decoder_layer = cast(EncoderDecoderBlock, model.decoder[0])
     assert decoder_layer.cross_attention.query.weight.grad is not None
     assert model.lm_head.weight is model.token_embeddings.weight
+    for expected, actual in zip(reference.parameters(), model.parameters(), strict=True):
+        assert expected.grad is not None and actual.grad is not None
+        torch.testing.assert_close(actual.grad, expected.grad, rtol=1e-6, atol=1e-7)

@@ -1,0 +1,13 @@
+# Security and privacy audit
+
+## Executed and observed
+
+Source review covered artifact hashing/loading, path containment, explicit local data preparation, opt-in acquisition/upload, input/schema limits, missing-weight behavior, environment-based credentials, and no-pickle loading checks. Regression tests cover artifact/path/checksum/input cases. The first `python -m ruff check --select S packages tools` reported seven findings: one redundant `assert` (`S101`); an environment-variable-name default (`HF_TOKEN`, `S107`); a literal tokenizer control token passed as `unk_token` (`S106`); and four deterministic `random.Random` uses for synthetic OCR augmentation, statistical bootstrap, and resumable data shuffling (`S311`). Source and related tests were inspected. The redundant assert was removed because the preceding branch already raises if the buffer is absent. Six line-specific `noqa` annotations now explain that the remaining flagged values are an environment-variable name, tokenizer control spelling, and reproducibility PRNG uses; no module/global rule is disabled. The rerun `python -m ruff check --select S packages tools` passes.
+
+`pip-audit` 2.10.1 was attempted against the current host environment with CycloneDX output. It failed before completing because the configured proxy at `127.0.0.1:9` refused the PyPI vulnerability database connection. This is **not a clean dependency scan**. The security workflow was inspected but not run. No secret scanner, Semgrep, Bandit or Trivy result is claimed. A preliminary unresolved source-declaration inventory is provided as [`orion-source-declarations.cdx.json`](orion-source-declarations.cdx.json); it is schema-validated as CycloneDX 1.6, but is not a resolved, transitive release SBOM.
+
+## Residual risk
+
+No monitored network-denial runtime test, external penetration review, dependency database result, legal/privacy review, PII false-negative study, production API threat test, or model artifact review was completed. License checks validate recorded metadata, not legal permission. No formal compliance claim is made. The GitHub security workflow now includes Ruff S rules, `pip-audit`, and a pickle-load scan, but no resolved SBOM generation or complete requested security pipeline.
+
+Evidence: [`security-audit.md`](../implementation/security-audit.md), `.github/workflows/security.yml`, `tests/test_independence.py`, `tests/test_data_prepare.py`. Official references used for recovery/API choices include [PyTorch FSDP](https://docs.pytorch.org/docs/main/distributed/fsdp.html) and the project’s dated [research ledger](../../docs/research/research-ledger.md).

@@ -65,8 +65,14 @@ def _make_training(
 ]:
     dataset = TokenBlockDataset(token_shard, sequence_length=config.sequence_length)
     sampler = StatefulRandomSampler(dataset, seed=config.trainer.seed)
+    loader_options = config.trainer.data_loader_options
     loader: DataLoader[dict[str, torch.Tensor]] = DataLoader(
-        dataset, batch_size=config.batch_size, sampler=sampler, num_workers=0
+        dataset,
+        batch_size=config.batch_size,
+        sampler=sampler,
+        num_workers=loader_options.num_workers,
+        prefetch_factor=loader_options.prefetch_factor,
+        persistent_workers=loader_options.persistent_workers,
     )
     seed_everything(config.trainer.seed)
     model = Orion300MDecoder(config.model)
@@ -159,7 +165,15 @@ def evaluate_causal_lm(
             if key != "token_shard_sha256"
         }
     )
-    loader = DataLoader(dataset, batch_size=config.batch_size, shuffle=False, num_workers=0)
+    loader_options = config.trainer.data_loader_options
+    loader = DataLoader(
+        dataset,
+        batch_size=config.batch_size,
+        shuffle=False,
+        num_workers=loader_options.num_workers,
+        prefetch_factor=loader_options.prefetch_factor,
+        persistent_workers=loader_options.persistent_workers,
+    )
     loss = trainer.evaluate(loader, max_batches=max_batches)
     manager = trainer.checkpoint_manager
     if manager is None:

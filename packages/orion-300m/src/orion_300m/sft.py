@@ -232,11 +232,14 @@ def _make_trainer(
 ]:
     dataset = SFTJsonlDataset(path, config=config)
     sampler = StatefulRandomSampler(dataset, seed=config.trainer.seed)
+    loader_options = config.trainer.data_loader_options
     loader = DataLoader(
         dataset,
         batch_size=config.batch_size,
         sampler=sampler,
-        num_workers=0,
+        num_workers=loader_options.num_workers,
+        prefetch_factor=loader_options.prefetch_factor,
+        persistent_workers=loader_options.persistent_workers,
         collate_fn=lambda rows: collate_sft_records(rows, pad_token_id=config.model.pad_token_id),
     )
     seed_everything(config.trainer.seed)

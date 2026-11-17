@@ -183,7 +183,8 @@ def bootstrap_interval(
         raise ValueError(
             "bootstrap requires non-empty values, positive resamples, and confidence in (0,1)"
         )
-    generator = random.Random(seed)
+    # Bootstrap resampling is statistical, reproducible sampling, not cryptography.
+    generator = random.Random(seed)  # noqa: S311
     estimates = []
     for _ in range(resamples):
         sample = [values[generator.randrange(len(values))] for _ in values]

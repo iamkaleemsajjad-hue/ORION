@@ -1,0 +1,1369 @@
+{
+  "schema_version": "1.0",
+  "audit_date": "2026-11-16",
+  "audited_revision": "7d3186c7a0378ef0878a49c524068338af945547",
+  "status_vocabulary": [
+    "NOT IMPLEMENTED",
+    "PARTIALLY IMPLEMENTED",
+    "IMPLEMENTED — NOT VERIFIED",
+    "VERIFIED",
+    "BLOCKED BY EXTERNAL DEPENDENCY",
+    "NOT APPLICABLE — JUSTIFIED"
+  ],
+  "requirements": [
+    {
+      "requirement_id": "PLAN-01",
+      "category": "Implementation plan section 1",
+      "priority": "P1",
+      "description": "Independent 100M encoder and 300M generator; no pretrained substitution",
+      "existing_implementation": "`orion_100m`, `orion_300m`, release metadata",
+      "existing_evidence": "`tests/test_independence.py`, missing-weight and release checks",
+      "deficiencies": "Independent architectures and local-only loading are present; no weights are claimed.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_100m`, `orion_300m`, release metadata",
+      "configuration": "`orion_100m.config`, `orion_300m.config`, release manifests",
+      "tests": [
+        "tests/test_independence.py"
+      ],
+      "verification_command": "python -m pytest -q tests/test_independence.py",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "VERIFIED",
+      "dependencies": [
+        "PLAN-03",
+        "PLAN-06",
+        "PLAN-16"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-02",
+      "category": "Implementation plan section 2",
+      "priority": "P1",
+      "description": "Standalone, offline, provenance-first model family",
+      "existing_implementation": "SDK packages, `orion_data`, docs",
+      "existing_evidence": "import-boundary tests; SDK loads local paths only",
+      "deficiencies": "SDK/model paths are local-only by design, but a monitored network-denial run and installed-mode inference are absent; offline behavior is therefore not fully verified.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "SDK packages, `orion_data`, docs",
+      "configuration": "`configs/deployment/local-api.json`",
+      "tests": [
+        "tests/test_independence.py",
+        "tests/test_sdk_api.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Local-only behavior is covered by source tests; monitored outbound-network denial and clean installed-mode execution have not run. Final source suite: 89 passed, 2 skipped, 4 warnings in 56.39 s.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-03",
+        "PLAN-07"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-03",
+      "category": "Implementation plan section 3",
+      "priority": "P1",
+      "description": "Shared core and separate model weights",
+      "existing_implementation": "`orion_core`, both model packages",
+      "existing_evidence": "architecture and package-boundary tests",
+      "deficiencies": "Shared code is separated from model weights; package boundaries are covered by import tests.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_core`, both model packages",
+      "configuration": "Typed model configs and tokenizer release manifest",
+      "tests": [
+        "tests/test_architectures.py",
+        "tests/test_independence.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "VERIFIED",
+      "dependencies": [
+        "PLAN-07"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-04",
+      "category": "Implementation plan section 4",
+      "priority": "P1",
+      "description": "Document classification, matching, extraction, embeddings, unknown detection",
+      "existing_implementation": "`orion_100m` heads/SDK and `orion_eval`",
+      "existing_evidence": "architecture, evaluation and SDK contract tests; learned predictions need weights",
+      "deficiencies": "Task APIs/heads exist; classification, calibration and unknown detection quality require trained weights and held-out data.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_100m` heads/SDK and `orion_eval`",
+      "configuration": "100M fine-tuning recipes; `configs/evaluation/default.json`",
+      "tests": [
+        "tests/test_supervised_training.py",
+        "tests/test_evaluation.py",
+        "tests/test_sdk_api.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-06",
+        "PLAN-08",
+        "PLAN-10",
+        "PLAN-11"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-05",
+      "category": "Implementation plan section 5",
+      "priority": "P1",
+      "description": "Encoder design comparison and decision",
+      "existing_implementation": "architecture decision docs and config",
+      "existing_evidence": "rationale recorded; planned ablations were not run",
+      "deficiencies": "Candidate reasoning is documented; real ablation results were not run.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "architecture decision docs and config",
+      "configuration": "`reports/implementation/decision-records.md`",
+      "tests": [
+        "tests/test_architecture_pilot.py",
+        "tests/test_configurations.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-06"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-06",
+      "category": "Implementation plan section 6",
+      "priority": "P1",
+      "description": "100M encoder dimensions, attention pattern, initialization and parameter count",
+      "existing_implementation": "`orion_100m.config`, `model.encoder`",
+      "existing_evidence": "`tests/test_architectures.py`, `python tools/count_params.py`",
+      "deficiencies": "Count and CPU behavior match; initialization quality and planned local/global ablations need training experiments.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_100m.config`, `model.encoder`",
+      "configuration": "`configs/pretraining/orion-100m-rtd.json`, `orion_100m.config`",
+      "tests": [
+        "tests/test_architectures.py"
+      ],
+      "verification_command": "python -m pytest -q tests/test_architectures.py",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "VERIFIED",
+      "dependencies": [
+        "PLAN-07"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-07",
+      "category": "Implementation plan section 7",
+      "priority": "P0",
+      "description": "Shared tokenizer contract and stable token IDs",
+      "existing_implementation": "`orion_tokenizer`, core artifact checks",
+      "existing_evidence": "tiny synthetic train/verify/export checks; map approved for experimental research, production artifact absent",
+      "deficiencies": "Added explicit owner gate and map digest; map approved for experimental research, production tokenizer absent.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_tokenizer`, core artifact checks",
+      "configuration": "`configs/tokenizer/byte-bpe-v1.json`, `STATUS.json`",
+      "tests": [
+        "tests/test_tokenizer.py",
+        "tests/test_tokenizer_release.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": []
+    },
+    {
+      "requirement_id": "PLAN-08",
+      "category": "Implementation plan section 8",
+      "priority": "P0",
+      "description": "Dataset choices, annotations, source licensing and provenance",
+      "existing_implementation": "`orion_data`, `datasets/manifests`, dataset cards",
+      "existing_evidence": "synthetic manifest and acquisition-policy tests; no corpus included",
+      "deficiencies": "Source records must be created from authorized real sources; none were downloaded.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_data`, `datasets/manifests`, dataset cards",
+      "configuration": "`datasets/manifests/`, `datasets/cards/`",
+      "tests": [
+        "tests/test_data_prepare.py",
+        "tests/test_configurations.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-07"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-09",
+      "category": "Implementation plan section 9",
+      "priority": "P1",
+      "description": "Data refinement, filtering, deduplication, segmentation and shards",
+      "existing_implementation": "`orion_data` pipeline, `prepare`, shard readers/writers",
+      "existing_evidence": "local checksum-pinned JSONL prepare and verify command exercised with synthetic fixtures; corpus scale and real-data leakage remain unmeasured",
+      "deficiencies": "Added `prepare`/`verify-prepared` and checksum/policy checks; pipeline holds records in memory and is not corpus-scale benchmarked.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_data` pipeline, `prepare`, shard readers/writers",
+      "configuration": "`configs/data/orion-data-preparation.json`",
+      "tests": [
+        "tests/test_data_prepare.py",
+        "tests/test_training_data.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-07",
+        "PLAN-08"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-10",
+      "category": "Implementation plan section 10",
+      "priority": "P1",
+      "description": "ORION-100M RTD/GDES objective and pretraining",
+      "existing_implementation": "`orion_100m.training`, `orion_train`",
+      "existing_evidence": "loss/gradient tests and one tiny synthetic CPU step",
+      "deficiencies": "Synthetic objective/gradient path passes; no RTD pretraining run or scaling evidence exists.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_100m.training`, `orion_train`",
+      "configuration": "`configs/pretraining/orion-100m-rtd.json`",
+      "tests": [
+        "tests/test_architectures.py",
+        "tests/test_training_data.py",
+        "tests/test_supervised_training.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-07",
+        "PLAN-09",
+        "PLAN-25"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-11",
+      "category": "Implementation plan section 11",
+      "priority": "P1",
+      "description": "ORION-100M multi-task fine-tuning, confidence and unknown detection",
+      "existing_implementation": "`orion_100m.finetuning`, `orion_100m.contrastive`, `orion_100m.course_matching`, task heads and `orion_eval`",
+      "existing_evidence": "synthetic multi-task, Matryoshka contrastive and known/unknown registry-prototype optimizer steps; calibration on unseen real courses remains required",
+      "deficiencies": "Synthetic updates run; unseen-course thresholds and confidence calibration remain data/training dependent.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_100m.finetuning`, `orion_100m.contrastive`, `orion_100m.course_matching`, task heads and `orion_eval`",
+      "configuration": "`configs/finetuning/orion-100m-{multitask,contrastive,course-matching}.json`",
+      "tests": [
+        "tests/test_supervised_training.py",
+        "tests/test_evaluation.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-07",
+        "PLAN-09",
+        "PLAN-25"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-12",
+      "category": "Implementation plan section 12",
+      "priority": "P1",
+      "description": "Sealed evaluation, baselines, metrics and intervals",
+      "existing_implementation": "`orion_eval`, evaluation configs",
+      "existing_evidence": "metric, calibration, bootstrap and sealed-split tests; no held-out evaluation of trained ORION weights",
+      "deficiencies": "Evaluation tools execute on fixtures; sealed quality targets/baselines remain unmeasured.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_eval`, evaluation configs",
+      "configuration": "`configs/evaluation/default.json`",
+      "tests": [
+        "tests/test_evaluation.py",
+        "tests/test_preflight.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-11",
+        "PLAN-20"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-13",
+      "category": "Implementation plan section 13",
+      "priority": "P1",
+      "description": "ONNX export, quantization, cache and offline deployment",
+      "existing_implementation": "`tools/export_onnx.py`, SDK, generation cache",
+      "existing_evidence": "export tooling exists; trained-artifact parity and performance not measured",
+      "deficiencies": "Export/deployment tooling exists; ONNX parity, quantization and speed are not measured.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`tools/export_onnx.py`, SDK, generation cache",
+      "configuration": "`configs/deployment/local-api.json`, `tools/export_onnx.py`",
+      "tests": [
+        "tests/test_architectures.py",
+        "tests/test_sdk_api.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-16",
+        "PLAN-17"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-14",
+      "category": "Implementation plan section 14",
+      "priority": "P1",
+      "description": "300M educational tasks, grounding and abstention interfaces",
+      "existing_implementation": "`orion_300m` SDK/generation",
+      "existing_evidence": "synthetic decoding, no-context, citation and API tests; learned answers need trained weights",
+      "deficiencies": "Grounding/abstention/citation contracts are tested; generated answers require actual trained weights and host verification.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_300m` SDK/generation",
+      "configuration": "`configs/deployment/local-api.json`, 300M generation defaults",
+      "tests": [
+        "tests/test_architectures.py",
+        "tests/test_sdk_api.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-16",
+        "PLAN-17"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-15",
+      "category": "Implementation plan section 15",
+      "priority": "P1",
+      "description": "Decoder-only versus encoder-decoder/prefix-LM architecture arbiter",
+      "existing_implementation": "`orion_300m.architecture_pilot`, decoder prefix mode and encoder-decoder pilot",
+      "existing_evidence": "all three candidates run on the same synthetic source-target fixture with separate checkpoints and validation losses; approved-data E-300-1 results remain outstanding",
+      "deficiencies": "Added/runs synthetic candidate framework; production architecture selection awaits fair approved-data experiment.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_300m.architecture_pilot`, decoder prefix mode and encoder-decoder pilot",
+      "configuration": "`configs/evaluation/e-300-1-architecture-pilot.json`",
+      "tests": [
+        "tests/test_architecture_pilot.py",
+        "tests/test_architectures.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-07",
+        "PLAN-18",
+        "PLAN-25"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-16",
+      "category": "Implementation plan section 16",
+      "priority": "P1",
+      "description": "300M decoder dimensions, GQA, tying, initialization and count",
+      "existing_implementation": "`orion_300m.config`, `model.decoder`",
+      "existing_evidence": "`tests/test_architectures.py`, parameter-count report",
+      "deficiencies": "Exact tied-parameter count and synthetic causal/cache tests pass; quality and target-hardware memory remain unknown.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_300m.config`, `model.decoder`",
+      "configuration": "`configs/pretraining/orion-300m-causal.json`, `orion_300m.config`",
+      "tests": [
+        "tests/test_architectures.py"
+      ],
+      "verification_command": "python -m pytest -q tests/test_architectures.py",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "VERIFIED",
+      "dependencies": [
+        "PLAN-07"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-17",
+      "category": "Implementation plan section 17",
+      "priority": "P1",
+      "description": "Shared tokenizer and grounded chat/document template",
+      "existing_implementation": "tokenizer and `orion_300m.generation`",
+      "existing_evidence": "control-token and context/citation contract tests; final tokenizer artifact absent",
+      "deficiencies": "Both models validate shared tokenizer metadata; current map digest is approved for experimental research.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "tokenizer and `orion_300m.generation`",
+      "configuration": "Shared tokenizer recipe and v1 registry",
+      "tests": [
+        "tests/test_tokenizer.py",
+        "tests/test_sdk_api.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-07"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-18",
+      "category": "Implementation plan section 18",
+      "priority": "P1",
+      "description": "300M pretraining and instruction-data provenance",
+      "existing_implementation": "`orion_data`, manifests/cards",
+      "existing_evidence": "license and provenance policy tests; no datasets acquired",
+      "deficiencies": "Provenance interfaces exist; no corpus or instruction data acquired.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_data`, manifests/cards",
+      "configuration": "Dataset manifests/cards and `configs/pretraining/orion-300m-causal.json`",
+      "tests": [
+        "tests/test_data_prepare.py",
+        "tests/test_supervised_training.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-08"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-19",
+      "category": "Implementation plan section 19",
+      "priority": "P1",
+      "description": "Causal corpus stages and structured SFT rendering",
+      "existing_implementation": "`orion_300m.sft`, data/shard tools",
+      "existing_evidence": "chat renderer, assistant-mask and local tokenized JSONL tests; real corpus stages remain unrun",
+      "deficiencies": "Local transforms/rendering are tested synthetically; no real corpus/shards produced.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_300m.sft`, data/shard tools",
+      "configuration": "`configs/data/orion-data-preparation.json`, SFT writer APIs",
+      "tests": [
+        "tests/test_data_prepare.py",
+        "tests/test_supervised_training.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-07",
+        "PLAN-18"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-20",
+      "category": "Implementation plan section 20",
+      "priority": "P1",
+      "description": "Causal pretraining, z-loss and scaling ladder",
+      "existing_implementation": "`orion_300m.training`, shared losses",
+      "existing_evidence": "loss/gradient tests and one tiny synthetic CPU step; no scaling ladder run",
+      "deficiencies": "Causal loss path executes on tiny synthetic batch; scaling ladder not run.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_300m.training`, shared losses",
+      "configuration": "`configs/pretraining/orion-300m-causal.json`",
+      "tests": [
+        "tests/test_architectures.py",
+        "tests/test_training_data.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-19",
+        "PLAN-25"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-21",
+      "category": "Implementation plan section 21",
+      "priority": "P1",
+      "description": "SFT, abstention and citation shaping",
+      "existing_implementation": "`orion_300m.sft`, generation validators",
+      "existing_evidence": "assistant-only loss and tiny synthetic SFT step pass; no real SFT data or checkpoint",
+      "deficiencies": "Assistant-only target mask and tiny update pass; no real SFT corpus/model.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_300m.sft`, generation validators",
+      "configuration": "`configs/finetuning/orion-300m-sft.json`",
+      "tests": [
+        "tests/test_supervised_training.py",
+        "tests/test_sdk_api.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-19",
+        "PLAN-20"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-22",
+      "category": "Implementation plan section 22",
+      "priority": "P1",
+      "description": "Grounded/human evaluation metrics and targets",
+      "existing_implementation": "`orion_eval`, evaluation docs",
+      "existing_evidence": "metrics execute on synthetic fixtures; quality targets remain unmeasured",
+      "deficiencies": "Metrics run on fixtures; acceptance targets are not results.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_eval`, evaluation docs",
+      "configuration": "`configs/evaluation/default.json`",
+      "tests": [
+        "tests/test_evaluation.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-18",
+        "PLAN-20",
+        "PLAN-21"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-23",
+      "category": "Implementation plan section 23",
+      "priority": "P1",
+      "description": "KV cache, streaming, quantization and speed/quality",
+      "existing_implementation": "`orion_300m` generation, export tool",
+      "existing_evidence": "cached/uncached and streaming CPU tests; quantization and benchmarks not validated",
+      "deficiencies": "KV-cache correctness is tested; GPU, ONNX, quantization and latency claims remain unverified.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_300m` generation, export tool",
+      "configuration": "`configs/deployment/local-api.json` and model generation config",
+      "tests": [
+        "tests/test_architectures.py",
+        "tests/test_sdk_api.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-16",
+        "PLAN-17"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-24",
+      "category": "Implementation plan section 24",
+      "priority": "P1",
+      "description": "Byte BPE, 32,768 IDs, reserved IDs, golden behavior",
+      "existing_implementation": "`orion_tokenizer`",
+      "existing_evidence": "synthetic byte/Unicode/Urdu/OCR/code tests and serialization checks; final tokenizer not trained",
+      "deficiencies": "Fixed `Regex` API usage and atomic staged release; trained 32,768-token v1 is pending corpus authorization and training.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_tokenizer`",
+      "configuration": "`configs/tokenizer/byte-bpe-v1.json`, registry, approval and release status",
+      "tests": [
+        "tests/test_tokenizer.py",
+        "tests/test_tokenizer_release.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-07"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-25",
+      "category": "Implementation plan section 25",
+      "priority": "P0",
+      "description": "Core blocks, optimizer, configs, checkpoint/recovery, tracking",
+      "existing_implementation": "core/train packages",
+      "existing_evidence": "CPU math, update, integrity and resume-equivalence tests; external tracking is not integrated",
+      "deficiencies": "Single-process resume and synthetic updates are tested. Worker-prefetch consumed-cursor recovery is implemented but Linux execution is pending; external tracking is not integrated; FSDP is not implemented.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "core/train packages",
+      "configuration": "`TrainerConfig`; model-specific pretraining/fine-tuning recipes",
+      "tests": [
+        "tests/test_training_data.py",
+        "tests/test_supervised_training.py",
+        "tests/test_preflight.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "PARTIALLY IMPLEMENTED",
+      "dependencies": [
+        "PLAN-09",
+        "PLAN-16"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-25-DIST",
+      "category": "Implementation plan section 25",
+      "priority": "P0",
+      "description": "DDP/FSDP, rank-aware training, and exact distributed recovery",
+      "existing_implementation": "orion_train.distributed, trainer.py, stateful samplers, and checkpoint metadata",
+      "existing_evidence": "Sampler sharding unit test passes; two-process exact-resume test is blocked on this Windows PyTorch Gloo backend; FSDP is not implemented",
+      "deficiencies": "DDP and two-worker recovery implementations/tests exist, but Gloo and worker integration tests are not verified on Linux. FSDP remains unimplemented and needs a distinct optimizer/checkpoint lifecycle.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "orion_train.distributed, trainer.py, stateful samplers, and checkpoint metadata",
+      "configuration": "`TrainerConfig.distributed_*` fields",
+      "tests": [
+        "tests/test_distributed_training.py",
+        "tests/test_training_data.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Sampler partition unit test passed. Two-process Gloo and two-worker prefetch resume tests are skipped on this host and are configured in Ubuntu CI, not yet run.",
+      "status": "PARTIALLY IMPLEMENTED",
+      "dependencies": [
+        "PLAN-25"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-26",
+      "category": "Implementation plan section 26",
+      "priority": "P1",
+      "description": "Hardware and memory feasibility",
+      "existing_implementation": "config/docs and architecture counts",
+      "existing_evidence": "exact counts verified; no GPU, memory, cost or throughput benchmark",
+      "deficiencies": "Counts are measured; memory/time/cost entries are planning assumptions without target-GPU benchmark.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "config/docs and architecture counts",
+      "configuration": "Both pretraining configs and hardware docs",
+      "tests": [
+        "tests/test_architectures.py",
+        "tests/test_preflight.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-06",
+        "PLAN-16"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-27",
+      "category": "Implementation plan section 27",
+      "priority": "P1",
+      "description": "SDK, CLI, REST schemas, limits and errors",
+      "existing_implementation": "model packages and FastAPI apps",
+      "existing_evidence": "SDK/API tests include ordered generation batches, CLI help/info/config commands; no trained inference artifact",
+      "deficiencies": "API/SDK synthetic contracts pass; installed-mode package/entry-point checks await a clean dependency install.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "model packages and FastAPI apps",
+      "configuration": "`configs/deployment/local-api.json` and SDK schemas",
+      "tests": [
+        "tests/test_sdk_api.py",
+        "tests/test_preflight.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-07",
+        "PLAN-13",
+        "PLAN-14",
+        "PLAN-28"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-28",
+      "category": "Implementation plan section 28",
+      "priority": "P0",
+      "description": "Monorepo and independently installable packages",
+      "existing_implementation": "eight package directories and workspace config",
+      "existing_evidence": "all eight wheels build and import from a workspace-local target; isolated dependency-resolving install remains",
+      "deficiencies": "All eight wheels and sdists build, package README metadata is checked, and direct Pydantic metadata was fixed. Genuine resolver-based lock generation, clean installs, and installed entry-point tests remain blocked by index access.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "eight package directories and workspace config",
+      "configuration": "Root `pyproject.toml` and all eight package `pyproject.toml` files",
+      "tests": [
+        "tests/test_independence.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Eight wheels and eight sdists built; wheel Markdown descriptions and sdist README files validated. No dependency-resolved clean install or isolated pip check was possible.",
+      "status": "PARTIALLY IMPLEMENTED",
+      "dependencies": [
+        "PLAN-03"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-29",
+      "category": "Implementation plan section 29",
+      "priority": "P1",
+      "description": "Optional isolated MADAD adapter with preserved host responsibilities",
+      "existing_implementation": "`orion_madad_adapter`",
+      "existing_evidence": "synthetic contract and standalone import tests; MADAD repository not present or modified",
+      "deficiencies": "Adapter tests use synthetic payloads; MADAD source is absent and untouched.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`orion_madad_adapter`",
+      "configuration": "`orion-madad-adapter` contracts",
+      "tests": [
+        "tests/test_madad_adapter.py",
+        "tests/test_independence.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "VERIFIED",
+      "dependencies": [
+        "PLAN-27"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-30",
+      "category": "Implementation plan section 30",
+      "priority": "P1",
+      "description": "Licensing, privacy, safe serialization and local APIs",
+      "existing_implementation": "data policy, core serializer, APIs, security docs",
+      "existing_evidence": "path/license/input/checksum/missing-weight tests; formal legal/privacy review pending",
+      "deficiencies": "Added path/hash/input safeguards; scanners and legal/privacy review remain external.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "data policy, core serializer, APIs, security docs",
+      "configuration": "Deployment config, dataset license/provenance manifests, security docs",
+      "tests": [
+        "tests/test_data_prepare.py",
+        "tests/test_training_data.py",
+        "tests/test_sdk_api.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-08",
+        "PLAN-28"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-31",
+      "category": "Implementation plan section 31",
+      "priority": "P1",
+      "description": "Risk register, governance and truthful release claims",
+      "existing_implementation": "model cards, governance/release docs and gates",
+      "existing_evidence": "release verifier rejects missing/untrained artifacts; owner decisions remain",
+      "deficiencies": "Release verifier rejects absent/untrained artifacts; no release or benchmark claims exist.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "model cards, governance/release docs and gates",
+      "configuration": "Governance docs, model cards, release verifier",
+      "tests": [
+        "tests/test_evaluation.py",
+        "tests/test_tokenizer_release.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-12",
+        "PLAN-22",
+        "PLAN-30"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-32",
+      "category": "Implementation plan section 32",
+      "priority": "P1",
+      "description": "Automated architecture, tokenizer, training, inference, API and security QA",
+      "existing_implementation": "`tests/`, CI configuration",
+      "existing_evidence": "full local pytest suite and Ruff pass; CI and full security scans not run",
+      "deficiencies": "Local 77/1 suite and static checks pass; GitHub workflows/security scans were not run.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`tests/`, CI configuration",
+      "configuration": "`pytest.ini`, root quality config and `.github/workflows/`",
+      "tests": [
+        "tests/test_architectures.py",
+        "tests/test_tokenizer.py",
+        "tests/test_training_data.py",
+        "tests/test_sdk_api.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "PARTIALLY IMPLEMENTED",
+      "dependencies": [
+        "PLAN-28"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-33",
+      "category": "Implementation plan section 33",
+      "priority": "P1",
+      "description": "Phase release criteria",
+      "existing_implementation": "`tools/verify_release.py`, model cards",
+      "existing_evidence": "verifier checks metadata and artifact integrity; no release satisfies trained-model criteria",
+      "deficiencies": "Artifact validation exists; neither model meets trained release gate.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`tools/verify_release.py`, model cards",
+      "configuration": "Release metadata and `tools/verify_release.py`",
+      "tests": [
+        "tests/test_evaluation.py",
+        "tests/test_tokenizer_release.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-31"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-34",
+      "category": "Implementation plan section 34",
+      "priority": "P1",
+      "description": "Milestones and separation of implementation from training",
+      "existing_implementation": "milestone docs/configs",
+      "existing_evidence": "implementation phase documented; training/data acquisition commands not invoked",
+      "deficiencies": "Milestones/commands are documented; tokenizer/data/model production commands were not invoked.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "milestone docs/configs",
+      "configuration": "Development roadmap and documented CLIs",
+      "tests": [
+        "tests/test_preflight.py",
+        "tests/test_tokenizer_release.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-25"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-35",
+      "category": "Implementation plan section 35",
+      "priority": "P0",
+      "description": "Architecture decisions and unresolved owner inputs",
+      "existing_implementation": "`docs/architecture/decisions.md`",
+      "existing_evidence": "D8/D9/D10/D13 and document permissions are listed explicitly",
+      "deficiencies": "Token mapping is approved for experimental research; architecture pilot choice remains pending real evidence.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "`docs/architecture/decisions.md`",
+      "configuration": "Decision records and tokenizer owner approval record",
+      "tests": [
+        "tests/test_architecture_pilot.py",
+        "tests/test_tokenizer_release.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "BLOCKED BY EXTERNAL DEPENDENCY",
+      "dependencies": [
+        "PLAN-07",
+        "PLAN-15"
+      ]
+    },
+    {
+      "requirement_id": "PLAN-36",
+      "category": "Implementation plan section 36",
+      "priority": "P1",
+      "description": "Primary research and official API documentation",
+      "existing_implementation": "research ledgers",
+      "existing_evidence": "URLs, access dates, decisions and uncertainties recorded; independent source/API checks are not CI-enforced",
+      "deficiencies": "Primary sources and checked dates are recorded; source/API drift is not automatically CI-enforced.",
+      "planned_or_applied_resolution": "Preserve the reviewed implementation; residual production, platform, owner-approval, or trained-artifact gates are stated in the audit reports.",
+      "source_modules": "research ledgers",
+      "configuration": "`docs/research/research-ledger.md`",
+      "tests": [
+        "tests/test_configurations.py"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-03",
+        "PLAN-25"
+      ]
+    },
+    {
+      "requirement_id": "HARD-DEP-01",
+      "category": "Reproducible resolved workspace",
+      "priority": "P0",
+      "description": "Genuine uv lock and clean dependency-resolving install of all eight packages",
+      "existing_implementation": "See category audit report and source modules referenced there.",
+      "existing_evidence": "No uv executable/cache, no uv.lock; configured package index/proxy unavailable. Eight wheels built only with dependencies disabled.",
+      "deficiencies": "No uv executable/cache, uv.lock, or package-index access. PIP_NO_INDEX=1 prevented pip from querying; in a diagnostic child with package indexing enabled, the configured proxy refused connections. Do not hand-write a lockfile.",
+      "planned_or_applied_resolution": "Restore approved package index; install pinned uv; resolve and review lock; clean install, pip check, import/CLI/preflight tests.",
+      "source_modules": [],
+      "configuration": [],
+      "tests": [
+        "tests/test_independence.py"
+      ],
+      "verification_command": "See category-specific command in reports/final/FINAL_VERIFICATION_LOG.md or run the next action stated in this row.",
+      "actual_verification_result": "uv and package index unavailable; no genuine lock/clean install. Eight wheels built with --no-deps; inspected orion-train metadata confirms Requires-Dist: pydantic<3,>=2.7.",
+      "status": "BLOCKED BY EXTERNAL DEPENDENCY",
+      "dependencies": []
+    },
+    {
+      "requirement_id": "HARD-DEP-02",
+      "category": "Supported tokenizer dependency",
+      "priority": "P0",
+      "description": "Tokenizers declared range >=0.23.3,<0.24 installed and verified",
+      "existing_implementation": "See category audit report and source modules referenced there.",
+      "existing_evidence": "Only Tokenizers 0.22.2 available; source preflight fails dependency gate.",
+      "deficiencies": "Only Tokenizers 0.22.2 is installed. Official PyPI metadata lists release 0.23.3 and a CPython 3.10 Windows x86-64 ABI3 wheel, but this workspace cannot download it through the configured proxy.",
+      "planned_or_applied_resolution": "Resolve supported wheel and run tokenizer suite in isolated environment.",
+      "source_modules": [],
+      "configuration": [],
+      "tests": [
+        "tests/test_tokenizer.py",
+        "tests/test_tokenizer_release.py"
+      ],
+      "verification_command": "See category-specific command in reports/final/FINAL_VERIFICATION_LOG.md or run the next action stated in this row.",
+      "actual_verification_result": "Only Tokenizers 0.22.2 available; source preflight fails dependency gate.",
+      "status": "BLOCKED BY EXTERNAL DEPENDENCY",
+      "dependencies": []
+    },
+    {
+      "requirement_id": "HARD-TOK-01",
+      "category": "Owner-approved shared tokenizer registry",
+      "priority": "P0",
+      "description": "Approve registry digest and freeze one shared tokenizer v1 before corpus use",
+      "existing_implementation": "See category audit report and source modules referenced there.",
+      "existing_evidence": "Registry digest 733da01709c59745290542da2bed85df615873777d35167c61c35bb01f544190 is approved for experimental research; production corpus/training remain pending.",
+      "deficiencies": "Registry digest 733da01709c59745290542da2bed85df615873777d35167c61c35bb01f544190 is approved for experimental research; production corpus/training remain pending.",
+      "planned_or_applied_resolution": "Preserve the approved digest; authorize corpus sources and target environment separately before production training.",
+      "source_modules": [],
+      "configuration": [],
+      "tests": [
+        "tests/test_tokenizer_release.py"
+      ],
+      "verification_command": "See category-specific command in reports/final/FINAL_VERIFICATION_LOG.md or run the next action stated in this row.",
+      "actual_verification_result": "Registry digest 733da01709c59745290542da2bed85df615873777d35167c61c35bb01f544190 is approved for experimental research; production corpus/training remain pending.",
+      "status": "BLOCKED BY EXTERNAL DEPENDENCY",
+      "dependencies": []
+    },
+    {
+      "requirement_id": "HARD-DATA-01",
+      "category": "Authorized production datasets",
+      "priority": "P0",
+      "description": "Approved provenance/licensing and real datasets for preparation/training/evaluation",
+      "existing_implementation": "See category audit report and source modules referenced there.",
+      "existing_evidence": "No dataset was acquired or downloaded. Synthetic-only data tests.",
+      "deficiencies": "No dataset was acquired or downloaded. Synthetic-only data tests.",
+      "planned_or_applied_resolution": "Obtain explicit data authorization and prepare immutable local manifests.",
+      "source_modules": [],
+      "configuration": [],
+      "tests": [
+        "tests/test_data_prepare.py"
+      ],
+      "verification_command": "See category-specific command in reports/final/FINAL_VERIFICATION_LOG.md or run the next action stated in this row.",
+      "actual_verification_result": "No dataset was acquired or downloaded. Synthetic-only data tests.",
+      "status": "BLOCKED BY EXTERNAL DEPENDENCY",
+      "dependencies": []
+    },
+    {
+      "requirement_id": "HARD-DIST-01",
+      "category": "DDP runtime verification",
+      "priority": "P1",
+      "description": "Two-process Gloo gradient and recovery test on supported Linux",
+      "existing_implementation": "See category audit report and source modules referenced there.",
+      "existing_evidence": "DDP orchestration exists; current Windows backend skips integration test.",
+      "deficiencies": "Windows denies process-pipe and Gloo-device creation. Actual Linux tests are configured in Ubuntu CI but no GitHub run is available from this workspace.",
+      "planned_or_applied_resolution": "Run the multiprocess-recovery Ubuntu job; it executes the two-worker recovery and DDP gradient/recovery test node IDs.",
+      "source_modules": [],
+      "configuration": [],
+      "tests": [
+        "tests/test_training_data.py::test_multiworker_prefetch_checkpoint_tracks_consumed_samples",
+        "tests/test_distributed_training.py::test_ddp_gradient_sync_and_exact_rank_state_resume"
+      ],
+      "verification_command": "See category-specific command in reports/final/FINAL_VERIFICATION_LOG.md or run the next action stated in this row.",
+      "actual_verification_result": "Final source suite after the last code/test change: 89 passed, 2 skipped, 4 warnings in 56.39 s. The skips are Windows Gloo and multiprocessing named-pipe restrictions; this does not verify production data or learned model quality.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": []
+    },
+    {
+      "requirement_id": "HARD-FSDP-01",
+      "category": "Memory-bound FSDP support",
+      "priority": "P2",
+      "description": "FSDP wrapping and sharded optimizer/model checkpoint lifecycle if required by target memory",
+      "existing_implementation": "See category audit report and source modules referenced there.",
+      "existing_evidence": "FSDP absent. Plan makes it conditional for memory-bound runs; recommended single 80-GB device does not itself require it.",
+      "deficiencies": "FSDP absent. Plan makes it conditional for memory-bound runs; recommended single 80-GB device does not itself require it.",
+      "planned_or_applied_resolution": "Decide after target memory pilot; if needed implement and validate on CUDA FSDP.",
+      "source_modules": [],
+      "configuration": [],
+      "tests": [
+        "tests/test_distributed_training.py"
+      ],
+      "verification_command": "See category-specific command in reports/final/FINAL_VERIFICATION_LOG.md or run the next action stated in this row.",
+      "actual_verification_result": "FSDP is not implemented; local PyTorch is CPU-only and cannot establish accelerator behavior. Remains a conditional external implementation gate if target memory requires sharding.",
+      "status": "PARTIALLY IMPLEMENTED",
+      "dependencies": []
+    },
+    {
+      "requirement_id": "HARD-SEC-01",
+      "category": "Dependency vulnerability audit",
+      "priority": "P1",
+      "description": "Run a current dependency vulnerability scan on resolved project environment",
+      "existing_implementation": "See category audit report and source modules referenced there.",
+      "existing_evidence": "pip-audit request failed through proxy before database result; no clean finding status.",
+      "deficiencies": "pip-audit request failed through proxy before database result; no clean finding status.",
+      "planned_or_applied_resolution": "Run pip-audit/OSV scan from network-enabled CI after lock resolution and remediate.",
+      "source_modules": [],
+      "configuration": [],
+      "tests": [],
+      "verification_command": "See category-specific command in reports/final/FINAL_VERIFICATION_LOG.md or run the next action stated in this row.",
+      "actual_verification_result": "pip-audit request failed through proxy before database result; no clean finding status.",
+      "status": "BLOCKED BY EXTERNAL DEPENDENCY",
+      "dependencies": []
+    },
+    {
+      "requirement_id": "HARD-SEC-02",
+      "category": "Release SBOM",
+      "priority": "P1",
+      "description": "Generate a lock-derived transitive SBOM for actual ORION distributions",
+      "existing_implementation": "See category audit report and source modules referenced there.",
+      "existing_evidence": "Preliminary source declaration CycloneDX file records unresolved direct constraints only; no transitive resolved graph.",
+      "deficiencies": "Preliminary source declaration CycloneDX file records unresolved direct constraints only; no transitive resolved graph.",
+      "planned_or_applied_resolution": "Generate release SBOM from locked clean environment and validate with CycloneDX tooling.",
+      "source_modules": [],
+      "configuration": [],
+      "tests": [],
+      "verification_command": "See category-specific command in reports/final/FINAL_VERIFICATION_LOG.md or run the next action stated in this row.",
+      "actual_verification_result": "Preliminary source declaration CycloneDX file records unresolved direct constraints only; no transitive resolved graph.",
+      "status": "PARTIALLY IMPLEMENTED",
+      "dependencies": []
+    },
+    {
+      "requirement_id": "HARD-OFFLINE-01",
+      "category": "Monitored offline runtime",
+      "priority": "P1",
+      "description": "Verify no outbound calls during installed local inference/tokenization/API use",
+      "existing_implementation": "See category audit report and source modules referenced there.",
+      "existing_evidence": "Local-only design and no implicit model fetch; network-denial observation absent.",
+      "deficiencies": "Local-only design and no implicit model fetch; network-denial observation absent.",
+      "planned_or_applied_resolution": "Run network-denied integration suite after artifacts and deps are installed.",
+      "source_modules": [],
+      "configuration": [],
+      "tests": [
+        "tests/test_sdk_api.py",
+        "tests/test_independence.py"
+      ],
+      "verification_command": "See category-specific command in reports/final/FINAL_VERIFICATION_LOG.md or run the next action stated in this row.",
+      "actual_verification_result": "Local-only design and no implicit model fetch; network-denial observation absent.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": []
+    },
+    {
+      "requirement_id": "HARD-EXPORT-01",
+      "category": "ONNX/quantization parity",
+      "priority": "P2",
+      "description": "Compare exported/quantized outputs with reference model and measure resources",
+      "existing_implementation": "See category audit report and source modules referenced there.",
+      "existing_evidence": "Export tooling exists; no ONNX Runtime/quantization parity or benchmark run.",
+      "deficiencies": "Export tooling exists; no ONNX Runtime/quantization parity or benchmark run.",
+      "planned_or_applied_resolution": "Install optional export dependencies and execute parity on trained artifacts.",
+      "source_modules": [],
+      "configuration": [],
+      "tests": [
+        "tests/test_architectures.py",
+        "tests/test_sdk_api.py"
+      ],
+      "verification_command": "See category-specific command in reports/final/FINAL_VERIFICATION_LOG.md or run the next action stated in this row.",
+      "actual_verification_result": "Export tooling exists; no ONNX Runtime/quantization parity or benchmark run.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": []
+    },
+    {
+      "requirement_id": "HARD-TRAIN-01",
+      "category": "Authorized training and evaluation",
+      "priority": "P0",
+      "description": "Run future tokenizer/data/model training and held-out evaluation only after explicit approval",
+      "existing_implementation": "See category audit report and source modules referenced there.",
+      "existing_evidence": "No authorization/data/artifacts; no training run occurred.",
+      "deficiencies": "No authorization/data/artifacts; no training run occurred.",
+      "planned_or_applied_resolution": "After prerequisites and authorization, follow documented staged commands.",
+      "source_modules": [],
+      "configuration": [],
+      "tests": [
+        "tests/test_training_data.py",
+        "tests/test_supervised_training.py",
+        "tests/test_evaluation.py"
+      ],
+      "verification_command": "See category-specific command in reports/final/FINAL_VERIFICATION_LOG.md or run the next action stated in this row.",
+      "actual_verification_result": "No authorization/data/artifacts; no training run occurred.",
+      "status": "BLOCKED BY EXTERNAL DEPENDENCY",
+      "dependencies": []
+    },
+    {
+      "requirement_id": "HARD-HW-01",
+      "category": "Target hardware readiness",
+      "priority": "P1",
+      "description": "Measure real device memory and validate CUDA/NCCL configurations",
+      "existing_implementation": "See category audit report and source modules referenced there.",
+      "existing_evidence": "Host has CPU-only PyTorch; target GPU and memory not available.",
+      "deficiencies": "Host has CPU-only PyTorch; target GPU and memory not available.",
+      "planned_or_applied_resolution": "Run bounded preflight/pilot on selected training hardware.",
+      "source_modules": [],
+      "configuration": [],
+      "tests": [
+        "tests/test_preflight.py",
+        "tests/test_architectures.py"
+      ],
+      "verification_command": "See category-specific command in reports/final/FINAL_VERIFICATION_LOG.md or run the next action stated in this row.",
+      "actual_verification_result": "Host has CPU-only PyTorch; target GPU and memory not available.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": []
+    },
+    {
+      "requirement_id": "HARD-CI-01",
+      "category": "CI quality gates",
+      "priority": "P1",
+      "description": "Continuous integration executes strict mypy and security-focused Ruff S rules.",
+      "existing_implementation": "Added `uv run mypy packages tests tools --show-error-codes` to ci.yml and `uv run ruff check --select S packages tools` to security.yml.",
+      "existing_evidence": "Both commands passed locally after the workflow changes; workflow YAML parses. GitHub jobs were not executed.",
+      "deficiencies": "No GitHub Actions execution or clean lock-based workspace was available; dependency scans remain separately blocked.",
+      "planned_or_applied_resolution": "Run these gates in CI after dependency resolution; keep dependency audit and installed-package tests as separate gates.",
+      "source_modules": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/security.yml",
+        "packages/orion-core/src/orion_core/blocks/attention.py",
+        "packages/orion-data/src/orion_data/acquire.py",
+        "packages/orion-data/src/orion_data/pipeline.py",
+        "packages/orion-eval/src/orion_eval/metrics.py",
+        "packages/orion-tokenizer/src/orion_tokenizer/training.py",
+        "packages/orion-train/src/orion_train/sampler.py"
+      ],
+      "configuration": [
+        "pyproject.toml"
+      ],
+      "tests": [
+        "tests/test_architectures.py",
+        "tests/test_training_data.py",
+        "tests/test_evaluation.py",
+        "tests/test_tokenizer_release.py"
+      ],
+      "verification_command": "python -m mypy packages tests tools --show-error-codes; python -m ruff check --select S packages tools; python -m pytest -q; parse .github/workflows/*.yml",
+      "actual_verification_result": "Local strict mypy, Ruff, Ruff security rules for packages/tools, format, compile, and full pytest pass. GitHub Actions runs and dependency-resolved setup remain unverified.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "PLAN-32"
+      ]
+    },
+    {
+      "requirement_id": "HARD-TRAIN-02",
+      "category": "Training memory controls",
+      "priority": "P1",
+      "description": "Optional Transformer activation checkpointing with deterministic recomputation for supported ORION training models",
+      "existing_implementation": "TrainerConfig.gradient_checkpointing and block-level checkpoint toggles in encoder, RTD generator/discriminator, causal decoder, and E-300-1 pilot models",
+      "existing_evidence": "tests/test_architectures.py output/RNG/gradient parity and KV-cache checks; tests/test_training_data.py model-specific synthetic trainer uses checkpointing",
+      "deficiencies": "GPU memory reduction and throughput have not been measured; checkpointing does not reduce parameter, gradient, or optimizer-state memory.",
+      "planned_or_applied_resolution": "Implemented using PyTorch non-reentrant checkpointing with RNG preservation; training with causal KV cache is rejected.",
+      "source_modules": "packages/orion-train/src/orion_train/config.py; packages/orion-train/src/orion_train/trainer.py; packages/orion-100m/src/orion_100m/model/encoder.py; packages/orion-100m/src/orion_100m/model/pretraining.py; packages/orion-300m/src/orion_300m/model/decoder.py; packages/orion-300m/src/orion_300m/model/encoder_decoder.py",
+      "configuration": "TrainerConfig.gradient_checkpointing",
+      "tests": [
+        "tests/test_architectures.py",
+        "tests/test_training_data.py::test_model_specific_trainers_resume_and_evaluate_synthetic_runs"
+      ],
+      "verification_command": "python -m pytest -q",
+      "actual_verification_result": "Final full source suite: 89 passed, 2 platform-blocked tests skipped, 4 warnings in 56.39 s. Checkpointing parity and actual synthetic trainer integration passed; no GPU benchmark was run.",
+      "status": "VERIFIED",
+      "dependencies": [
+        "PLAN-25"
+      ]
+    },
+    {
+      "requirement_id": "HARD-DOC-01",
+      "category": "Readiness diagnostics",
+      "priority": "P1",
+      "description": "Read-only environment doctor and preflight statuses must distinguish verified checks from missing approvals, untested backends, and unavailable hardware.",
+      "existing_implementation": "orion_core.doctor.run_doctor; doctor and preflight CLI output; explicit result status categories",
+      "existing_evidence": "tests/test_preflight.py::test_doctor_is_read_only_and_never_marks_unverified_checks_as_pass; tests/test_preflight.py::test_doctor_cli_renders_human_readable_status; live source-path doctor returned blocked without network access or training",
+      "deficiencies": "Installed-mode doctor execution is not verified because dependency-resolved installation is blocked.",
+      "planned_or_applied_resolution": "Implemented JSON/text diagnostics, truthful backend states, package/lock checks, owner-approval status, and a no-network/no-training contract.",
+      "source_modules": "packages/orion-core/src/orion_core/doctor.py; packages/orion-core/src/orion_core/cli.py; packages/orion-core/src/orion_core/preflight.py",
+      "configuration": "Workspace root and optional model/device/dataset/tokenizer inputs",
+      "tests": [
+        "tests/test_preflight.py"
+      ],
+      "verification_command": "python -m pytest -q tests/test_preflight.py; python -m pytest -q",
+      "actual_verification_result": "Doctor/preflight behavior tests pass in the final 89-pass suite. Live environment is blocked by Tokenizers 0.22.2, absent uv/lock, missing trained artifact, global pip conflicts, and unavailable CUDA; doctor made no network request.",
+      "status": "IMPLEMENTED — NOT VERIFIED",
+      "dependencies": [
+        "HARD-DEP-01",
+        "HARD-DEP-02",
+        "HARD-HW-01"
+      ]
+    },
+    {
+      "requirement_id": "HARD-PKG-01",
+      "category": "Distribution metadata",
+      "priority": "P2",
+      "description": "All eight independently installable distributions provide package-specific full Markdown descriptions and include them in source distributions.",
+      "existing_implementation": "Each packages/*/pyproject.toml declares project.readme = README.md and each package contains its own README.md.",
+      "existing_evidence": "tests/test_package_metadata.py checks all package metadata; archive inspection confirmed each wheel has Description-Content-Type: text/markdown and each sdist includes README.md.",
+      "deficiencies": "Metadata/build correctness is verified, but no publication or clean dependency-resolved installation was performed.",
+      "planned_or_applied_resolution": "Added eight package-specific READMEs and a regression test after reproducing setuptools missing-README warnings.",
+      "source_modules": "packages/*/pyproject.toml; packages/*/README.md; tests/test_package_metadata.py",
+      "configuration": "PEP 621 project.readme metadata",
+      "tests": [
+        "tests/test_package_metadata.py"
+      ],
+      "verification_command": "python -m pytest -q tests/test_package_metadata.py; python -m build --no-isolation --outdir build/closure-distributions <each of eight package directories>",
+      "actual_verification_result": "1 regression test passed; all 8 wheel/sdist pairs built; all wheel descriptions and sdist README files were inspected; no missing-README build warning remained.",
+      "status": "VERIFIED",
+      "dependencies": []
+    },
+    {
+      "requirement_id": "HARD-HW-02",
+      "category": "Hardware/memory preflight",
+      "priority": "P2",
+      "description": "Report a transparent persistent AdamW training-state memory lower bound without misrepresenting it as peak memory or device-fit proof.",
+      "existing_implementation": "orion_core.resource_estimates computes parameter, gradient, and first/second AdamW moment bytes; model-specific preflight reports assumptions and preserves peak capacity as NOT TESTED.",
+      "existing_evidence": "tests/test_preflight.py verifies exact 100M/300M byte arithmetic, invalid inputs, and WARNING status; doctor/preflight path does not start training.",
+      "deficiencies": "Activation/workspace peak and the 100M RTD generator/head overhead are excluded; no CUDA hardware was available to measure a full step.",
+      "planned_or_applied_resolution": "Implemented an explicitly lower-bound-only estimate and kept actual target memory capacity unverified/blocking.",
+      "source_modules": "packages/orion-core/src/orion_core/resource_estimates.py; packages/orion-core/src/orion_core/preflight.py",
+      "configuration": "Canonical parameter targets and default FP32 parameter/gradient/AdamW moment dtypes.",
+      "tests": [
+        "tests/test_preflight.py::test_adamw_memory_floor_counts_fp32_parameters_gradients_and_two_moments",
+        "tests/test_preflight.py::test_adamw_memory_floor_rejects_invalid_counts_and_element_sizes",
+        "tests/test_preflight.py::test_training_preflight_reports_pending_prerequisites_without_starting"
+      ],
+      "verification_command": "python -m pytest -q tests/test_preflight.py; python -m pytest -q",
+      "actual_verification_result": "8 preflight tests passed; final suite: 89 passed, 2 skipped, 4 warnings in 56.39 s. The estimate is a tested arithmetic lower bound, not measured peak or hardware fit.",
+      "status": "VERIFIED",
+      "dependencies": [
+        "PLAN-26",
+        "HARD-DOC-01"
+      ]
+    }
+  ],
+  "requirement_dependency_edges": {
+    "PLAN-01": [
+      "PLAN-03",
+      "PLAN-06",
+      "PLAN-16"
+    ],
+    "PLAN-02": [
+      "PLAN-03",
+      "PLAN-07"
+    ],
+    "PLAN-03": [
+      "PLAN-07"
+    ],
+    "PLAN-04": [
+      "PLAN-06",
+      "PLAN-08",
+      "PLAN-10",
+      "PLAN-11"
+    ],
+    "PLAN-05": [
+      "PLAN-06"
+    ],
+    "PLAN-06": [
+      "PLAN-07"
+    ],
+    "PLAN-08": [
+      "PLAN-07"
+    ],
+    "PLAN-09": [
+      "PLAN-07",
+      "PLAN-08"
+    ],
+    "PLAN-10": [
+      "PLAN-07",
+      "PLAN-09",
+      "PLAN-25"
+    ],
+    "PLAN-11": [
+      "PLAN-07",
+      "PLAN-09",
+      "PLAN-25"
+    ],
+    "PLAN-12": [
+      "PLAN-11",
+      "PLAN-20"
+    ],
+    "PLAN-13": [
+      "PLAN-16",
+      "PLAN-17"
+    ],
+    "PLAN-14": [
+      "PLAN-16",
+      "PLAN-17"
+    ],
+    "PLAN-15": [
+      "PLAN-07",
+      "PLAN-18",
+      "PLAN-25"
+    ],
+    "PLAN-16": [
+      "PLAN-07"
+    ],
+    "PLAN-17": [
+      "PLAN-07"
+    ],
+    "PLAN-18": [
+      "PLAN-08"
+    ],
+    "PLAN-19": [
+      "PLAN-07",
+      "PLAN-18"
+    ],
+    "PLAN-20": [
+      "PLAN-19",
+      "PLAN-25"
+    ],
+    "PLAN-21": [
+      "PLAN-19",
+      "PLAN-20"
+    ],
+    "PLAN-22": [
+      "PLAN-18",
+      "PLAN-20",
+      "PLAN-21"
+    ],
+    "PLAN-23": [
+      "PLAN-16",
+      "PLAN-17"
+    ],
+    "PLAN-24": [
+      "PLAN-07"
+    ],
+    "PLAN-25": [
+      "PLAN-09",
+      "PLAN-16"
+    ],
+    "PLAN-25-DIST": [
+      "PLAN-25"
+    ],
+    "PLAN-26": [
+      "PLAN-06",
+      "PLAN-16"
+    ],
+    "PLAN-27": [
+      "PLAN-07",
+      "PLAN-13",
+      "PLAN-14",
+      "PLAN-28"
+    ],
+    "PLAN-28": [
+      "PLAN-03"
+    ],
+    "PLAN-29": [
+      "PLAN-27"
+    ],
+    "PLAN-30": [
+      "PLAN-08",
+      "PLAN-28"
+    ],
+    "PLAN-31": [
+      "PLAN-12",
+      "PLAN-22",
+      "PLAN-30"
+    ],
+    "PLAN-32": [
+      "PLAN-28"
+    ],
+    "PLAN-33": [
+      "PLAN-31"
+    ],
+    "PLAN-34": [
+      "PLAN-25"
+    ],
+    "PLAN-35": [
+      "PLAN-07",
+      "PLAN-15"
+    ],
+    "PLAN-36": [
+      "PLAN-03",
+      "PLAN-25"
+    ],
+    "HARD-TRAIN-02": [
+      "PLAN-25"
+    ],
+    "HARD-DOC-01": [
+      "HARD-DEP-01",
+      "HARD-DEP-02",
+      "HARD-HW-01"
+    ],
+    "HARD-PKG-01": [],
+    "HARD-HW-02": [
+      "PLAN-26",
+      "HARD-DOC-01"
+    ]
+  },
+  "scope_note": "Final source suite after memory-estimate implementation: 89 passed, two Windows multiprocess tests skipped. Clean package resolution, production tokenizer/data training, Linux distributed execution, and target GPU peak memory remain external gates."
+}

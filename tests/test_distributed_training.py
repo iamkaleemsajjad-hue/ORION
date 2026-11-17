@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import socket
 import sys
@@ -143,7 +144,8 @@ def test_distributed_samplers_have_equal_disjoint_shards() -> None:
 
 
 @pytest.mark.skipif(
-    not dist.is_gloo_available() or sys.platform == "win32",
+    (not dist.is_gloo_available() and os.getenv("ORION_REQUIRE_GLOO") != "1")
+    or sys.platform == "win32",
     reason=(
         "this Windows PyTorch build cannot create a Gloo network device; "
         "run the process-group test on a supported Linux runner"

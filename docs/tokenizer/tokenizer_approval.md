@@ -1,8 +1,8 @@
 # Tokenizer v1 owner approval record
 
-**Current state: PENDING OWNER REVIEW.** No production tokenizer may be trained
-or released using the provisional token map until the owner completes this
-record. The implementation team has not supplied owner approval.
+**Current state: APPROVED for experimental research training with this token map.**
+The production tokenizer remains untrained. Corpus/source authorization and any
+commercial release approval are separate decisions.
 
 ## Mapping under review
 
@@ -20,13 +20,13 @@ Fill these fields only after reviewing every owner-review item in the registry.
 
 | Field | Value |
 |---|---|
-| Decision | PENDING |
-| Owner name or authorized role | PENDING |
-| Decision date (ISO 8601) | PENDING |
-| Approved special-token map SHA-256 | PENDING |
-| Approved byte mapping and normalization | PENDING |
-| Approved generation-emittable controls | PENDING |
-| Notes or required changes | PENDING |
+| Decision | APPROVED |
+| Owner name or authorized role | Project owner, explicitly authorizing experimental research training |
+| Decision date (ISO 8601) | 2026-11-16 |
+| Approved special-token map SHA-256 | 733da01709c59745290542da2bed85df615873777d35167c61c35bb01f544190 |
+| Approved byte mapping and normalization | Code-defined reversible byte alphabet, IDs 256-511, NFC normalization |
+| Approved generation-emittable controls | EOS, abstain, end-of-turn, and cite_1 through cite_16; other special tokens input-only |
+| Notes or required changes | Approved for experimental university research training using the currently implemented token map; not a claim of commercial release approval. |
 
 Approval applies only to the exact digest recorded above. If any token spelling,
 ID, normalization, or escaping behavior changes, update the registry, compute a

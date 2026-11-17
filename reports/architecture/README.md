@@ -1,7 +1,8 @@
 # Architecture verification
 
 `parameter-counts.json` records the target and executable counts for both
-implemented model bodies. Reproduce the check with:
+implemented model bodies. Run the following from an environment where the
+ORION packages have been installed using the root README's development setup:
 
 ```powershell
 python tools/count_params.py

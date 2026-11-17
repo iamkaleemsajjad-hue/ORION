@@ -1,5 +1,7 @@
 # Final audit inventory
 
+> **Historical baseline note:** the inventory below records the 2026-11-14 starting tree at `1251ac6`. The final engineering pass began from a newer clean revision and its current counts are recorded in the addendum at the end; use that addendum for the 2026-11-15 repository state.
+
 ## Audit baseline
 
 - Audit date: 2026-11-14 (workspace local date).
@@ -315,3 +317,25 @@ All eight package versions are `0.1.0`, and internal runtime dependencies use ex
   `NotImplementedError`, placeholder, fake benchmark, hardcoded prediction or
   `assert True` implementation/test. Synthetic fixtures and ONNX input tensors
   are described in `no_dummy_code_audit.md`.
+
+## Current repository snapshot (2026-11-16)
+
+This continuation inherited uncommitted audit work; it did not start from a
+clean working tree. At the beginning of the continuation, `master` and HEAD
+were `7d3186c7a0378ef0878a49c524068338af945547`, with 21 modified tracked paths
+and an untracked `reports/final/` directory. At the latest inventory, the
+tracked tree contains 225 files, 123 Python files (18,129 lines), 101
+package-source Python files (14,804 lines), 13 `test_*.py` modules (2,733
+lines), 61 Markdown files, 9 pyprojects, 11 `configs/` files, and 3 GitHub
+workflows. Eight packages are present, with zero tracked model/checkpoint
+artifacts and zero empty Python files.
+
+The original scaffold directories and ignored build/cache outputs were
+preserved. Current exact modified and untracked path lists are regenerated in
+[`reports/final/FINAL_GIT_STATE.md`](../final/FINAL_GIT_STATE.md) and
+[`reports/final/CHANGED_FILE_MANIFEST.md`](../final/CHANGED_FILE_MANIFEST.md).
+Historical counts above describe their dated snapshots, not this revision's
+working tree.
+
+The current final audit reports, latest validation results, and exact
+requirement statuses are in [`reports/final`](../final/EXECUTIVE_SUMMARY.md).

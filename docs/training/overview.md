@@ -90,19 +90,51 @@ exceeds the requested sequence length.
 
 `Trainer` supports AdamW, no-decay groups, gradient accumulation/clipping,
 autocast precision, schedulers, finite-value checks, validation-loss calls, and
-resumable checkpoints. Checkpoints use safetensors plus JSON; they do not use
+resumable checkpoints. `TrainerConfig` also controls `num_workers`,
+`prefetch_factor`, and `persistent_workers`; these settings are consumed by each
+model training runner. Checkpoints use safetensors plus JSON; they do not use
 pickle. DDP checkpoints add every rank's Python, NumPy, CPU/CUDA RNG and sampler
 cursor to the verified JSON metadata while rank zero writes the shared
-checkpoint. The exact-resume test is enabled on supported Linux runners but was
-skipped in this Windows run after Gloo initialization failed with `unsupported
-gloo device`; DDP is implemented but not locally verified. Multi-worker
-data-loader recovery and FSDP recovery are not implemented.
+checkpoint.
+
+Set `trainer.gradient_checkpointing` to `true` in a model training config to
+recompute Transformer blocks during backward and reduce retained activations.
+The encoder, RTD generator/discriminator, causal decoder, and E-300-1 pilot
+blocks use PyTorch's non-reentrant checkpoint API with RNG preservation. This
+trades additional compute for lower activation storage; it does not reduce
+parameter, gradient, or optimizer-state memory. Causal decoding with a KV cache
+is rejected while checkpointed training is active. Evaluation and inference do
+not checkpoint blocks. Checkpointing is disabled by default and does not alter
+the architecture or model weights.
+
+For ordered multi-worker loading, ORION separates sampler indices dispatched
+to workers from samples acknowledged by the training loop. Checkpoints store
+the acknowledged cursor, so prefetched but unconsumed batches replay after
+resume. `in_order=False` is rejected. Built-in ORION datasets and collators are
+deterministic; custom worker-side random transforms must be stateless per
+sample for exact replay. Use `num_workers=0` when a custom transform depends on
+worker-local random state. A two-worker interrupted/resumed equivalence test is
+configured in Ubuntu CI; it could not run in the managed Windows sandbox,
+which denied DataLoader named-pipe creation. The two-process Gloo test also
+requires Linux and could not run on this Windows PyTorch build. FSDP is not
+implemented or advertised.
 
 The large default configurations require substantial accelerator memory and
 compute. Only CPU smoke tests with small synthetic configurations were run; no
 hardware throughput or memory estimates were verified here. Do not begin full
 training until the plan's architecture, corpus licensing, tokenizer-ID review,
 compute budget, and experimental gates have been approved.
+
+Model-specific preflight now reports a deterministic persistent-state lower
+bound: it counts FP32 parameters, FP32 gradients, and two FP32 AdamW moments.
+For the planned parameter counts this is about 1.49 GiB for the 100M encoder
+body and 4.57 GiB for the 300M decoder. The 100M figure excludes its RTD
+generator and task heads. Both figures exclude activations, temporary kernels,
+allocator reserve, input buffers, and distributed overhead; they are not peak
+memory estimates and do not prove a configuration fits. Preflight therefore
+keeps measured target-device capacity as `NOT TESTED` until hardware profiling
+is performed. The estimate implementation and assumptions are in
+`orion_core.resource_estimates`.
 
 The E-300-1 pilot compares decoder-only, prefix-LM, and tied-embedding
 encoder-decoder candidates on matching tokenized source-target JSONL splits.

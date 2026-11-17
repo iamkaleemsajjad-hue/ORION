@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "orion-300m"
 version = "0.1.0"
 description = "Independent ORION-300M context-grounded educational language model software"
+readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 dependencies = [

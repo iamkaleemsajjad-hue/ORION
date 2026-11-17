@@ -67,7 +67,6 @@ class StaticKVCache:
         ):
             raise ValueError("KV cache batch, head, device, or dtype changed during generation")
         key_buffer[:batch, :, cache_position:end].copy_(key)
-        assert value_buffer is not None
         value_buffer[:batch, :, cache_position:end].copy_(value)
         return key_buffer[:batch, :, :end], value_buffer[:batch, :, :end]
 

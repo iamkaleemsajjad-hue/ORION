@@ -8,12 +8,21 @@ commands fail clearly when trained artifacts are missing. API servers bind to
 ## Environment preflight
 
 ```powershell
+orion doctor
+orion doctor --format text
 orion preflight
 orion preflight --mode installed
 orion preflight --model 100m --dataset-dir .\datasets\prepared\course-mix --tokenizer-dir .\artifacts\orion-tokenizer-v1 --device cuda --precision bf16
 ```
 
-The first command checks the source workspace, installed runtime versions, and
+`orion doctor` reports local package, Python, PyTorch, Tokenizers, lockfile,
+package-index policy, host-memory, disk, CUDA, Gloo, and NCCL checks as JSON.
+Use `--format text` for a readable rendering. It does not make network requests,
+start training, or reveal proxy values. Missing lock resolution, unavailable
+training hardware, or an unexecuted distributed check remain blocked or
+explicitly untested; backend availability is not evidence of communication.
+
+`orion preflight` checks the source workspace, installed runtime versions, and
 all checked-in run configurations. `--mode installed` checks the eight
 installed distributions instead. Adding `--model` also verifies local
 prepared data and tokenizer inputs; the command reports owner-approval,

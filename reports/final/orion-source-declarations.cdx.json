@@ -1,0 +1,681 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:52c53478-9353-40c7-bd1b-270e6c5a78a4",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-15T18:24:59Z",
+    "component": {
+      "type": "application",
+      "name": "ORION AI workspace source declarations",
+      "version": "0.1.0",
+      "bom-ref": "pkg:pypi/orion-ai-source-declarations@0.1.0"
+    },
+    "properties": [
+      {
+        "name": "orion:sbom-scope",
+        "value": "unresolved direct source-declared dependencies only"
+      },
+      {
+        "name": "orion:release-sbom",
+        "value": "false"
+      },
+      {
+        "name": "orion:limitations",
+        "value": "No resolved lock, installed ORION environment, exact transitive versions, hashes, or vulnerability status; optional and dev requirements are declarations."
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "orion-core",
+      "version": "0.1.0",
+      "purl": "pkg:pypi/orion-core@0.1.0",
+      "bom-ref": "pkg:pypi/orion-core@0.1.0",
+      "properties": [
+        {
+          "name": "orion:component-source",
+          "value": "workspace package declaration"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "orion-tokenizer",
+      "version": "0.1.0",
+      "purl": "pkg:pypi/orion-tokenizer@0.1.0",
+      "bom-ref": "pkg:pypi/orion-tokenizer@0.1.0",
+      "properties": [
+        {
+          "name": "orion:component-source",
+          "value": "workspace package declaration"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "orion-data",
+      "version": "0.1.0",
+      "purl": "pkg:pypi/orion-data@0.1.0",
+      "bom-ref": "pkg:pypi/orion-data@0.1.0",
+      "properties": [
+        {
+          "name": "orion:component-source",
+          "value": "workspace package declaration"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "orion-train",
+      "version": "0.1.0",
+      "purl": "pkg:pypi/orion-train@0.1.0",
+      "bom-ref": "pkg:pypi/orion-train@0.1.0",
+      "properties": [
+        {
+          "name": "orion:component-source",
+          "value": "workspace package declaration"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "orion-eval",
+      "version": "0.1.0",
+      "purl": "pkg:pypi/orion-eval@0.1.0",
+      "bom-ref": "pkg:pypi/orion-eval@0.1.0",
+      "properties": [
+        {
+          "name": "orion:component-source",
+          "value": "workspace package declaration"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "orion-100m",
+      "version": "0.1.0",
+      "purl": "pkg:pypi/orion-100m@0.1.0",
+      "bom-ref": "pkg:pypi/orion-100m@0.1.0",
+      "properties": [
+        {
+          "name": "orion:component-source",
+          "value": "workspace package declaration"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "orion-300m",
+      "version": "0.1.0",
+      "purl": "pkg:pypi/orion-300m@0.1.0",
+      "bom-ref": "pkg:pypi/orion-300m@0.1.0",
+      "properties": [
+        {
+          "name": "orion:component-source",
+          "value": "workspace package declaration"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "orion-madad-adapter",
+      "version": "0.1.0",
+      "purl": "pkg:pypi/orion-madad-adapter@0.1.0",
+      "bom-ref": "pkg:pypi/orion-madad-adapter@0.1.0",
+      "properties": [
+        {
+          "name": "orion:component-source",
+          "value": "workspace package declaration"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "torch",
+      "purl": "pkg:pypi/torch",
+      "bom-ref": "pkg:pypi/torch",
+      "properties": [
+        {
+          "name": "orion:version-constraint",
+          "value": ">=2.1,<3"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "required"
+        },
+        {
+          "name": "orion:version-constraint",
+          "value": ">=2.1,<3"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "required"
+        },
+        {
+          "name": "orion:version-constraint",
+          "value": ">=2.1,<3"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "required"
+        },
+        {
+          "name": "orion:version-constraint",
+          "value": ">=2.1,<3"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "required"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "safetensors",
+      "purl": "pkg:pypi/safetensors",
+      "bom-ref": "pkg:pypi/safetensors",
+      "properties": [
+        {
+          "name": "orion:version-constraint",
+          "value": ">=0.4,<1"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "required"
+        },
+        {
+          "name": "orion:version-constraint",
+          "value": ">=0.4,<1"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "required"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pydantic",
+      "purl": "pkg:pypi/pydantic",
+      "bom-ref": "pkg:pypi/pydantic",
+      "properties": [
+        {
+          "name": "orion:version-constraint",
+          "value": ">=2.7,<3"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "required"
+        },
+        {
+          "name": "orion:version-constraint",
+          "value": ">=2.7,<3"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "required"
+        },
+        {
+          "name": "orion:version-constraint",
+          "value": ">=2.7,<3"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "required"
+        },
+        {
+          "name": "orion:version-constraint",
+          "value": ">=2.7,<3"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "required"
+        },
+        {
+          "name": "orion:version-constraint",
+          "value": ">=2.7,<3"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "required"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pyyaml",
+      "purl": "pkg:pypi/pyyaml",
+      "bom-ref": "pkg:pypi/pyyaml",
+      "properties": [
+        {
+          "name": "orion:version-constraint",
+          "value": ">=6,<7"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "required"
+        },
+        {
+          "name": "orion:version-constraint",
+          "value": ">=6,<7"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "required"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "tokenizers",
+      "purl": "pkg:pypi/tokenizers",
+      "bom-ref": "pkg:pypi/tokenizers",
+      "properties": [
+        {
+          "name": "orion:version-constraint",
+          "value": ">=0.23.3,<0.24"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "required"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "numpy",
+      "purl": "pkg:pypi/numpy",
+      "bom-ref": "pkg:pypi/numpy",
+      "properties": [
+        {
+          "name": "orion:version-constraint",
+          "value": ">=1.24,<3"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "required"
+        },
+        {
+          "name": "orion:version-constraint",
+          "value": ">=1.24,<3"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "required"
+        },
+        {
+          "name": "orion:version-constraint",
+          "value": ">=1.24,<3"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "required"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pyarrow",
+      "purl": "pkg:pypi/pyarrow",
+      "bom-ref": "pkg:pypi/pyarrow",
+      "properties": [
+        {
+          "name": "orion:version-constraint",
+          "value": ">=15,<25"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "optional"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "huggingface-hub",
+      "purl": "pkg:pypi/huggingface-hub",
+      "bom-ref": "pkg:pypi/huggingface-hub",
+      "properties": [
+        {
+          "name": "orion:version-constraint",
+          "value": ">=0.25,<2"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "optional"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "datasketch",
+      "purl": "pkg:pypi/datasketch",
+      "bom-ref": "pkg:pypi/datasketch",
+      "properties": [
+        {
+          "name": "orion:version-constraint",
+          "value": ">=1.6,<2"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "optional"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "fastapi",
+      "purl": "pkg:pypi/fastapi",
+      "bom-ref": "pkg:pypi/fastapi",
+      "properties": [
+        {
+          "name": "orion:version-constraint",
+          "value": ">=0.110,<1"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "optional"
+        },
+        {
+          "name": "orion:version-constraint",
+          "value": ">=0.110,<1"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "optional"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "uvicorn",
+      "purl": "pkg:pypi/uvicorn",
+      "bom-ref": "pkg:pypi/uvicorn",
+      "properties": [
+        {
+          "name": "orion:version-constraint",
+          "value": ">=0.30,<1"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "optional"
+        },
+        {
+          "name": "orion:version-constraint",
+          "value": ">=0.30,<1"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "optional"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "onnx",
+      "purl": "pkg:pypi/onnx",
+      "bom-ref": "pkg:pypi/onnx",
+      "properties": [
+        {
+          "name": "orion:version-constraint",
+          "value": ">=1.16,<2"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "optional"
+        },
+        {
+          "name": "orion:version-constraint",
+          "value": ">=1.16,<2"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "optional"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "onnxruntime",
+      "purl": "pkg:pypi/onnxruntime",
+      "bom-ref": "pkg:pypi/onnxruntime",
+      "properties": [
+        {
+          "name": "orion:version-constraint",
+          "value": ">=1.18,<2"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "optional"
+        },
+        {
+          "name": "orion:version-constraint",
+          "value": ">=1.18,<2"
+        },
+        {
+          "name": "orion:dependency-scope",
+          "value": "optional"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pytest",
+      "purl": "pkg:pypi/pytest",
+      "bom-ref": "pkg:pypi/pytest",
+      "properties": [
+        {
+          "name": "orion:workspace-dev-constraint",
+          "value": ">=8.0,<10"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "pytest-cov",
+      "purl": "pkg:pypi/pytest-cov",
+      "bom-ref": "pkg:pypi/pytest-cov",
+      "properties": [
+        {
+          "name": "orion:workspace-dev-constraint",
+          "value": ">=5,<8"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "ruff",
+      "purl": "pkg:pypi/ruff",
+      "bom-ref": "pkg:pypi/ruff",
+      "properties": [
+        {
+          "name": "orion:workspace-dev-constraint",
+          "value": ">=0.6,<1"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "mypy",
+      "purl": "pkg:pypi/mypy",
+      "bom-ref": "pkg:pypi/mypy",
+      "properties": [
+        {
+          "name": "orion:workspace-dev-constraint",
+          "value": "==2.1.0"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "types-pyyaml",
+      "purl": "pkg:pypi/types-pyyaml",
+      "bom-ref": "pkg:pypi/types-pyyaml",
+      "properties": [
+        {
+          "name": "orion:workspace-dev-constraint",
+          "value": ">=6.0,<7"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "httpx",
+      "purl": "pkg:pypi/httpx",
+      "bom-ref": "pkg:pypi/httpx",
+      "properties": [
+        {
+          "name": "orion:workspace-dev-constraint",
+          "value": ">=0.27,<1"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "setuptools",
+      "purl": "pkg:pypi/setuptools",
+      "bom-ref": "pkg:pypi/setuptools",
+      "properties": [
+        {
+          "name": "orion:workspace-dev-constraint",
+          "value": ">=69"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "name": "wheel",
+      "purl": "pkg:pypi/wheel",
+      "bom-ref": "pkg:pypi/wheel",
+      "properties": [
+        {
+          "name": "orion:workspace-dev-constraint",
+          "value": "unbounded in declaration"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:pypi/orion-ai-source-declarations@0.1.0",
+      "dependsOn": [
+        "pkg:pypi/orion-core@0.1.0",
+        "pkg:pypi/orion-tokenizer@0.1.0",
+        "pkg:pypi/orion-data@0.1.0",
+        "pkg:pypi/orion-train@0.1.0",
+        "pkg:pypi/orion-eval@0.1.0",
+        "pkg:pypi/orion-100m@0.1.0",
+        "pkg:pypi/orion-300m@0.1.0",
+        "pkg:pypi/orion-madad-adapter@0.1.0",
+        "pkg:pypi/torch",
+        "pkg:pypi/safetensors",
+        "pkg:pypi/pydantic",
+        "pkg:pypi/pyyaml",
+        "pkg:pypi/tokenizers",
+        "pkg:pypi/numpy",
+        "pkg:pypi/pyarrow",
+        "pkg:pypi/huggingface-hub",
+        "pkg:pypi/datasketch",
+        "pkg:pypi/fastapi",
+        "pkg:pypi/uvicorn",
+        "pkg:pypi/onnx",
+        "pkg:pypi/onnxruntime",
+        "pkg:pypi/pytest",
+        "pkg:pypi/pytest-cov",
+        "pkg:pypi/ruff",
+        "pkg:pypi/mypy",
+        "pkg:pypi/types-pyyaml",
+        "pkg:pypi/httpx",
+        "pkg:pypi/setuptools",
+        "pkg:pypi/wheel"
+      ]
+    },
+    {
+      "ref": "pkg:pypi/orion-core@0.1.0",
+      "dependsOn": [
+        "pkg:pypi/pydantic",
+        "pkg:pypi/pyyaml",
+        "pkg:pypi/safetensors",
+        "pkg:pypi/torch"
+      ]
+    },
+    {
+      "ref": "pkg:pypi/orion-tokenizer@0.1.0",
+      "dependsOn": [
+        "pkg:pypi/orion-core@0.1.0",
+        "pkg:pypi/pydantic",
+        "pkg:pypi/tokenizers"
+      ]
+    },
+    {
+      "ref": "pkg:pypi/orion-data@0.1.0",
+      "dependsOn": [
+        "pkg:pypi/datasketch",
+        "pkg:pypi/huggingface-hub",
+        "pkg:pypi/numpy",
+        "pkg:pypi/orion-core@0.1.0",
+        "pkg:pypi/orion-tokenizer@0.1.0",
+        "pkg:pypi/pyarrow",
+        "pkg:pypi/pydantic",
+        "pkg:pypi/pyyaml"
+      ]
+    },
+    {
+      "ref": "pkg:pypi/orion-train@0.1.0",
+      "dependsOn": [
+        "pkg:pypi/numpy",
+        "pkg:pypi/orion-core@0.1.0",
+        "pkg:pypi/safetensors",
+        "pkg:pypi/torch"
+      ]
+    },
+    {
+      "ref": "pkg:pypi/orion-eval@0.1.0",
+      "dependsOn": [
+        "pkg:pypi/numpy",
+        "pkg:pypi/orion-core@0.1.0"
+      ]
+    },
+    {
+      "ref": "pkg:pypi/orion-100m@0.1.0",
+      "dependsOn": [
+        "pkg:pypi/fastapi",
+        "pkg:pypi/onnx",
+        "pkg:pypi/onnxruntime",
+        "pkg:pypi/orion-core@0.1.0",
+        "pkg:pypi/orion-data@0.1.0",
+        "pkg:pypi/orion-eval@0.1.0",
+        "pkg:pypi/orion-tokenizer@0.1.0",
+        "pkg:pypi/orion-train@0.1.0",
+        "pkg:pypi/pydantic",
+        "pkg:pypi/torch",
+        "pkg:pypi/uvicorn"
+      ]
+    },
+    {
+      "ref": "pkg:pypi/orion-300m@0.1.0",
+      "dependsOn": [
+        "pkg:pypi/fastapi",
+        "pkg:pypi/onnx",
+        "pkg:pypi/onnxruntime",
+        "pkg:pypi/orion-core@0.1.0",
+        "pkg:pypi/orion-data@0.1.0",
+        "pkg:pypi/orion-eval@0.1.0",
+        "pkg:pypi/orion-tokenizer@0.1.0",
+        "pkg:pypi/orion-train@0.1.0",
+        "pkg:pypi/pydantic",
+        "pkg:pypi/torch",
+        "pkg:pypi/uvicorn"
+      ]
+    },
+    {
+      "ref": "pkg:pypi/orion-madad-adapter@0.1.0",
+      "dependsOn": [
+        "pkg:pypi/orion-100m@0.1.0",
+        "pkg:pypi/orion-300m@0.1.0",
+        "pkg:pypi/orion-core@0.1.0"
+      ]
+    }
+  ]
+}

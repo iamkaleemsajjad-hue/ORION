@@ -16,7 +16,8 @@ def acquire_manifest_sources(
     output_root: str | Path,
     *,
     execute: bool = False,
-    token_env_var: str = "HF_TOKEN",
+    # This is the environment variable name; the credential value is read at call time.
+    token_env_var: str = "HF_TOKEN",  # noqa: S107
     license_mode: str = "research",
 ) -> list[Path]:
     """Download only explicitly requested HF dataset snapshots at pinned revisions."""

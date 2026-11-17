@@ -17,7 +17,10 @@ restore model/checkpoint files.
 single-process paths and for DDP rank state in the implemented format. A
 two-process Gloo test exists but was skipped on the current Windows PyTorch
 build because it cannot create a Gloo network device. FSDP is not implemented.
-Exact recovery with multi-worker DataLoader prefetch is not verified.
+Consumed-versus-prefetched cursor recovery is implemented and has a two-worker
+resume equivalence test in Ubuntu CI, but that test has not run in this host.
+Exact replay for stochastic worker transforms requires deterministic,
+per-sample transform behavior.
 
 ## ADR-002 - No trained release artifacts in the source repository
 

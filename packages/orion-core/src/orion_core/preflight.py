@@ -14,6 +14,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
+from orion_core.resource_estimates import estimate_adamw_memory_floor
+
 _PACKAGES: tuple[tuple[str, str], ...] = (
     ("orion-core", "orion_core"),
     ("orion-tokenizer", "orion_tokenizer"),
@@ -82,9 +84,20 @@ _TRAINING_ONLY_CHECKS = {
     "training-token-count",
     "whole-word-alignment",
     "trained-tokenizer",
+    "target-accelerator",
     "training-device",
+    "training-memory-estimate",
+    "training-memory-capacity",
     "training-precision-device",
 }
+ReadinessStatus = Literal[
+    "PASS",
+    "FAIL",
+    "WARNING",
+    "NOT TESTED",
+    "OWNER APPROVAL REQUIRED",
+    "EXTERNAL HARDWARE REQUIRED",
+]
 
 
 def run_preflight(
@@ -107,8 +120,15 @@ def run_preflight(
     blockers: list[str] = []
     notes: list[str] = []
 
-    def record(name: str, passed: bool, detail: str) -> None:
-        checks.append({"name": name, "passed": passed, "detail": detail})
+    def record(
+        name: str,
+        passed: bool,
+        detail: str,
+        *,
+        status: ReadinessStatus | None = None,
+    ) -> None:
+        check_status = status or ("PASS" if passed else "FAIL")
+        checks.append({"name": name, "passed": passed, "status": check_status, "detail": detail})
         if not passed:
             blockers.append(f"{name}: {detail}")
 
@@ -193,6 +213,19 @@ def run_preflight(
             notes.append(
                 "CUDA is unavailable; this preflight can only verify CPU-side software behavior"
             )
+            record(
+                "target-accelerator",
+                True,
+                "CUDA is unavailable; full-scale target accelerator capability is not established",
+                status="WARNING",
+            )
+        else:
+            record(
+                "target-accelerator",
+                True,
+                "CUDA is available; model-specific peak training memory has not been measured",
+                status="NOT TESTED",
+            )
 
     with _source_import_path(source_dirs if mode == "source" else []):
         _validate_configs(root, record)
@@ -212,12 +245,29 @@ def run_preflight(
             "approved"
             if tokenizer_approved
             else "pending; review docs/tokenizer/tokenizer_approval.md",
+            status="PASS" if tokenizer_approved else "OWNER APPROVAL REQUIRED",
         )
         if not trained:
             notes.append("production tokenizer v1 is not marked trained and available")
 
     training_checks_start = len(checks)
     if model is not None:
+        planned_parameters = {
+            "100m": (100_291_840, "encoder body only; excludes RTD generator and task heads"),
+            "300m": (306_763_200, "unique tied-embedding decoder parameters"),
+        }
+        parameter_count, parameter_scope = planned_parameters[model]
+        memory_floor = estimate_adamw_memory_floor(parameter_count)
+        record(
+            "training-memory-estimate",
+            True,
+            f"persistent FP32 parameter/gradient/AdamW-state lower bound: "
+            f"{memory_floor.total_bytes} bytes ({memory_floor.gib:.2f} GiB), "
+            f"based on {parameter_count:,} {parameter_scope}; excludes activations, "
+            "temporary workspaces, allocator reserve, and additional heads/generator; "
+            "not a peak-memory or fit guarantee",
+            status="WARNING",
+        )
         try:
             from orion_core.device import autocast_dtype, select_device
 
@@ -227,10 +277,40 @@ def run_preflight(
         except (RuntimeError, ValueError) as exc:
             record("training-device", False, str(exc))
         else:
-            record("training-device", True, str(selected))
+            if selected.type == "cpu":
+                record(
+                    "training-device",
+                    False,
+                    "CPU supports smoke tests; full ORION training capacity is unverified",
+                    status="EXTERNAL HARDWARE REQUIRED",
+                )
+            elif selected.type == "cuda":
+                record("training-device", True, str(selected))
+                try:
+                    free_memory, total_memory = torch.cuda.mem_get_info(selected)
+                except (RuntimeError, AttributeError) as exc:
+                    record("training-memory-capacity", False, f"memory query failed: {exc}")
+                else:
+                    record(
+                        "training-memory-capacity",
+                        False,
+                        f"{free_memory} bytes free of {total_memory}; peak memory for this "
+                        "configuration has not been measured",
+                        status="NOT TESTED",
+                    )
+            else:
+                record(
+                    "training-device",
+                    False,
+                    f"{selected} has not been validated for full ORION training",
+                    status="EXTERNAL HARDWARE REQUIRED",
+                )
             if precision is not None:
                 record(
-                    "training-precision-device", True, f"precision={precision}, device={selected}"
+                    "training-precision-device",
+                    selected.type == "cuda",
+                    f"precision={precision}, device={selected}",
+                    status="PASS" if selected.type == "cuda" else "EXTERNAL HARDWARE REQUIRED",
                 )
 
         prepared: dict[str, object] | None = None
@@ -239,6 +319,7 @@ def run_preflight(
                 "prepared-dataset",
                 False,
                 "pass --dataset-dir with a verified local prepared dataset",
+                status="OWNER APPROVAL REQUIRED",
             )
         else:
             try:
@@ -265,6 +346,7 @@ def run_preflight(
                 "trained-tokenizer",
                 False,
                 "pass --tokenizer-dir with an owner-approved trained tokenizer",
+                status="OWNER APPROVAL REQUIRED",
             )
         else:
             try:
@@ -314,13 +396,24 @@ def run_preflight(
 
     # Preserve only software checks in the software readiness result. Missing
     # owner-approved training assets do not indicate a broken installation.
-    training_checks = checks[training_checks_start:]
+    training_checks = checks[training_checks_start:] + [
+        check for check in checks[:training_checks_start] if check["name"] == "target-accelerator"
+    ]
     software_checks = [check for check in checks if check["name"] not in _TRAINING_ONLY_CHECKS]
     software_ready = all(check["passed"] for check in software_checks)
+    blocking_statuses = {
+        "FAIL",
+        "NOT TESTED",
+        "OWNER APPROVAL REQUIRED",
+        "EXTERNAL HARDWARE REQUIRED",
+    }
     training_ready = (
         model is not None
         and software_ready
-        and all(check["passed"] for check in training_checks)
+        and all(
+            check["passed"] and check["status"] not in blocking_statuses
+            for check in training_checks
+        )
         and tokenizer_approved
     )
     if model is None:
@@ -332,7 +425,8 @@ def run_preflight(
     blockers = [
         f"{check['name']}: {check['detail']}"
         for check in checks
-        if not check["passed"] and (model is not None or check["name"] not in _TRAINING_ONLY_CHECKS)
+        if (not check["passed"] or check["status"] in blocking_statuses)
+        and (model is not None or check["name"] not in _TRAINING_ONLY_CHECKS)
     ]
     return {
         "status": "ready" if software_ready and (model is None or training_ready) else "blocked",

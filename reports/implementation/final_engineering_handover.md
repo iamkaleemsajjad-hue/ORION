@@ -1,5 +1,10 @@
 # ORION AI final engineering audit and hardening handover
 
+> This 2026-11-14 handover is historical. The current final audit was refreshed
+> against revision `7d3186c7a0378ef0878a49c524068338af945547` on 2026-11-15;
+> see [`reports/final/EXECUTIVE_SUMMARY.md`](../final/EXECUTIVE_SUMMARY.md) and
+> its verification log before using any environment-specific status below.
+
 Audit date: 2026-11-14. Workspace: `C:\Users\pc\Desktop\ORION AI`.
 This is a local software handover. It does not claim trained model capability
 or that every acceptance gate passed.
@@ -76,8 +81,10 @@ precision handling, validation/metrics, and Safetensors-based recovery state.
 Tiny synthetic interruption/resume and RNG restoration are tested. DDP
 orchestration includes rank-aware sampling, synchronization, rank-zero writes,
 and per-rank state; its two-process Gloo integration test is skipped on this
-Windows build. FSDP and exact recovery under multi-worker prefetch are not
-implemented/verified. No actual training command was invoked.
+Windows build. Multi-worker prefetch cursor recovery is implemented and its
+two-worker resume equivalence test is configured for Ubuntu CI, but it has not
+run in this host. FSDP is not implemented. No actual model training command
+was invoked.
 
 FSDP cannot be added as a wrapper-only option: model builders create the
 optimizer before constructing `Trainer`, whereas PyTorch FSDP changes parameter
@@ -122,10 +129,11 @@ real training/evaluation and release checks.
 
 ## Verification evidence
 
-- `python -m pytest -q`: **77 passed, 1 skipped**, one PyTorch `pynvml`
-  deprecation warning (30.34 s). The skip is two-process Gloo on Windows.
+- `python -m pytest -q`: **82 passed, 2 skipped**, four environment/dependency
+  deprecation warnings (30.60 s). The skips are two-process Gloo and
+  multi-worker DataLoader recovery, which require a supported Linux runtime.
 - Strict mypy 2.1.0: **no issues in 121 analyzed source files**.
-- Ruff lint and `ruff format --check`: pass; **184 files already formatted**.
+- Ruff lint and `ruff format --check`: pass; **212 files already formatted**.
 - `compileall`: pass.
 - Exact parameter-count command: matches both plan targets.
 - Source preflight: imports and checked-in configuration contracts pass;

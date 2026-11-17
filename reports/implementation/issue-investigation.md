@@ -5,6 +5,15 @@ the source path, read related configs/tests/docs, identify the root cause, then
 change code and add or run regression verification. No training or data
 acquisition commands were invoked.
 
+## Package README metadata warning
+
+- **Finding:** Rebuilding package sdists emitted setuptools warnings that the standard README was absent; wheel metadata also lacked the full package description.
+- **Reproduction:** `python -m build --no-isolation --outdir build/closure-distributions <package>` reproduced the warning for the packages built before the metadata correction. The same missing-README metadata pattern was present in all eight package projects.
+- **Root cause:** Each package declared only a one-line `description`; no `[project].readme` field or package-local README existed.
+- **Research:** PyPA defines `project.readme` as the full package description and resolves the path relative to that package's `pyproject.toml`: https://packaging.python.org/en/latest/specifications/pyproject-toml/.
+- **Fix:** Added eight package-specific README files, declared `readme = "README.md"` in all package project metadata, and added a regression test covering all eight packages.
+- **Verification:** The final full test suite and rebuilt sdists/wheels must verify this correction; results are recorded in `reports/final/FINAL_VERIFICATION_LOG.md`.
+
 ## 1. Strict typing findings
 
 - **Original finding:** Prior handover reported 171 mypy errors across 48 files
@@ -109,8 +118,9 @@ acquisition commands were invoked.
 - **Regression/verification:** Sampler rank-sharding test passes. A real
   two-process Gloo gradient-sync/resume test is present but skipped on this
   Windows PyTorch build, which failed to create a Gloo network device.
-- **Remaining:** DDP runtime is not verified locally. FSDP and exact
-  multi-worker prefetch recovery are not implemented.
+- **Remaining:** DDP runtime is not verified locally. FSDP is not implemented.
+  Worker-prefetch recovery is implemented with acknowledged sampler cursors
+  and a real equivalence test, but Linux execution remains outstanding.
   Source inspection also confirmed FSDP cannot be introduced by wrapping the
   current trainer only: every model-specific builder creates AdamW before
   `Trainer`, while FSDP parameter wrapping must precede optimizer creation;
@@ -212,3 +222,24 @@ No clean dependency-resolving install, full dependency vulnerability scan,
 security workflow, CUDA/NCCL test, FSDP run, corpus-scale data validation,
 trained-weight inference, performance benchmark, or formal privacy/legal
 review was possible or performed. These are recorded as incomplete, not passed.
+
+
+## Final-pass findings (2026-11-15)
+
+### 11. Parameter-count utility invocation context
+
+- **Finding:** `python tools/count_params.py` failed in the current uninstalled source environment with `ModuleNotFoundError: orion_100m`.
+- **Genuine source defect?** No. The script imports the independently installable model distributions; the root README places it after the package installation steps. This audit environment has no ORION distributions installed because dependency resolution is blocked.
+- **Evidence/source path:** Read `tools/count_params.py`, `tools/inspect_model.py`, both model configs/architectures, root/workspace setup instructions, and `tests/test_architectures.py`. The exact-count architecture regression test passed. With `PYTHONPATH` set to all eight `packages/*/src` directories, the script ran on the meta device and reported 100,291,840 and 306,763,200 unique parameters, both matching the configured targets.
+- **Correction:** Clarified in `reports/architecture/README.md` that the direct command runs after installing the packages. No source workaround or package-boundary change was made.
+- **Verification:** `python -m pytest -q tests/test_architectures.py::test_planned_default_body_parameter_counts_on_meta_device` passed; explicit source-path `python tools/count_params.py` passed. Installed-mode execution remains blocked by package resolution.
+
+### 12. Missing CI type/security gates and Ruff security findings
+
+- **Finding:** CI installed pinned mypy but did not execute it; the security workflow did not run a first-party static security rule set. A focused Ruff `S` scan reproduced seven findings.
+- **Genuine?** Yes for the missing automation. The six password/randomness messages were context-specific false positives; the remaining `S101` was a redundant assert following an explicit None check.
+- **Files read:** Full CI/security workflow files, root pyproject, `attention.py`, `acquire.py`, `pipeline.py`, `metrics.py`, `sampler.py`, tokenizer `training.py`, and related architecture/sampler/evaluation/tokenizer tests.
+- **Research:** Ruff?s official S101 docs warn that asserts are removed under `python -O`; S106/S107 detect potential credential literals; S311 is about randomness used for security. Sources and checked date are in `docs/research/research-ledger.md`.
+- **Correction:** Added strict mypy to CI, Ruff S checks to security workflow, removed the redundant assert, and documented six exact-line exceptions for an environment-variable name, tokenizer special token, and seeded deterministic transforms. No global rule disable was added.
+- **Regression/verification:** `python -m ruff check --select S packages tools`, default Ruff, strict mypy, compileall and focused behavior tests passed. All three workflow YAML files parse. The final full suite after subsequent worker/dependency changes: 82 passed, 2 Windows multiprocessing skips, 4 warnings. GitHub workflows themselves were not run.
+- **Remaining:** Dependency scanning, network-denial, secrets tooling and external review remain incomplete; see `reports/final/SECURITY_AUDIT.md`.

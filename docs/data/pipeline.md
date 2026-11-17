@@ -72,6 +72,13 @@ Training inputs are available at:
 - Equivalent paths under `validation` and `test` for evaluation.
 - `<SPLIT>/packed/index.json` and its memmaps for boundary-aware readers.
 
+Model training configs control DataLoader worker count, prefetch, and persistent
+workers through `trainer.num_workers`, `trainer.prefetch_factor`, and
+`trainer.persistent_workers`. Resumable workers require ordered output and the
+ORION stateful sampler. Built-in map-style datasets are deterministic; custom
+worker-side transforms must be stateless per sample when exact resume is
+required.
+
 The pipeline holds records and MinHash signatures in memory. Large-corpus
 scaling, OCR workers, Parquet conversion, and licensed statistical language ID
 remain infrastructure/data-dependent and have not been benchmarked. No real

@@ -22,7 +22,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RECIPE_PATH = PROJECT_ROOT / "configs" / "tokenizer" / "byte-bpe-v1.json"
 
 
-def test_release_recipe_is_valid_but_does_not_claim_review_or_training() -> None:
+def test_release_recipe_is_valid_and_approved_but_does_not_claim_training() -> None:
     recipe = TokenizerReleaseConfig.model_validate(
         json.loads(RECIPE_PATH.read_text(encoding="utf-8"))
     )
@@ -30,9 +30,9 @@ def test_release_recipe_is_valid_but_does_not_claim_review_or_training() -> None
     assert recipe.vocab_size == 32768
     assert recipe.status == "pending"
     assert recipe.production_tokenizer_trained is False
-    assert recipe.special_token_id_table_reviewed is False
+    assert recipe.special_token_id_table_reviewed is True
     with pytest.raises(ValueError, match="complete owner review"):
-        recipe.training_config(approve_token_map=True)
+        recipe.training_config(approve_token_map=False)
 
 
 def test_tokenizer_training_recipe_requires_two_review_assertions() -> None:
@@ -62,7 +62,7 @@ def test_tokenizer_training_recipe_requires_two_review_assertions() -> None:
         ).validate()
 
 
-def test_tokenizer_cli_validates_pending_recipe_without_training(
+def test_tokenizer_cli_validates_untrained_recipe_without_training(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     status = main(["validate-config", "--config", str(RECIPE_PATH)])
@@ -70,7 +70,7 @@ def test_tokenizer_cli_validates_pending_recipe_without_training(
 
     assert status == 0
     assert result["valid"] is True
-    assert result["owner_reviewed"] is False
+    assert result["owner_reviewed"] is True
     assert result["production_tokenizer_trained"] is False
     assert result["training_started"] is False
 
@@ -122,6 +122,16 @@ def test_pending_owner_approval_blocks_tokenizer_cli_before_training(
     config_path = tmp_path / "reviewed-recipe.json"
     config_path.write_text(recipe.model_dump_json(), encoding="utf-8")
     output = tmp_path / "must-not-train"
+    project_root = tmp_path / "pending-project"
+    status_path = project_root / "packages/orion-tokenizer/releases/v1.0/STATUS.json"
+    status_path.parent.mkdir(parents=True)
+    status = json.loads(
+        (PROJECT_ROOT / "packages/orion-tokenizer/releases/v1.0/STATUS.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    status["owner_approval"] = "pending"
+    status_path.write_text(json.dumps(status), encoding="utf-8")
 
     status = main(
         [
@@ -133,7 +143,7 @@ def test_pending_owner_approval_blocks_tokenizer_cli_before_training(
             "--config",
             str(config_path),
             "--project-root",
-            str(PROJECT_ROOT),
+            str(project_root),
             "--confirm-training",
             "--approve-token-map",
         ]

@@ -1,0 +1,17 @@
+# Remaining external gates
+
+| Gate | Why it remains | Impact | Next action |
+|---|---|---|---|
+| Package resolver / genuine lock | `uv` absent, no cached wheel, configured index/proxy unavailable | Blocks reproducible clean installs, installed preflight and dependable future CLI workflow | Restore approved package index/network; install pinned uv, resolve and review real `uv.lock`; install all eight packages in a new environment and run `pip check`/entry-point tests. |
+| Token-map scope | Current digest is approved for experimental research; production scope remains provisional | Production token compatibility and final trained artifact remain open | Train and validate on a separately authorized corpus; obtain any additional release approval. |
+| Tokenizer/data/model training | No approved production corpus, trained weights, or target hardware | No learned model capabilities or real dataset evaluation | In the next authorized phase, approve licenses/data, train tokenizer, prepare shards, preflight target hardware, then run documented train/resume/evaluate commands. |
+| Linux Gloo DDP test | Windows backend cannot create Gloo network device; current test is skipped | DDP runtime synchronization/recovery not verified | Run `tests/test_distributed_training.py` on Linux CPU/Gloo; record actual two-process result. |
+| FSDP | Conditional plan feature not implemented; PyTorch requires accelerator and optimizer/checkpoint lifecycle refactor | Blocks memory-bound sharded training only; not a blanket gate for recommended single 80-GB setup | Decide from target memory pilot whether needed; if needed implement wrap-before-optimizer and sharded checkpoint state, test on CUDA FSDP. |
+| Linux multi-worker/Gloo verification | The managed Windows host denies named-pipe and Gloo device creation; actual process tests cannot run here | Worker-aware consumed-cursor recovery and DDP resume are implemented, but not runtime-verified on Linux | Run the `multiprocess-recovery` Ubuntu CI job or its exact two pytest node IDs from `.github/workflows/ci.yml`; retain the real output. Stochastic worker transforms must be stateless per sample for exact replay. |
+| Vulnerability audit / full SBOM | Proxy blocked vulnerability database; no resolved transitive dependency graph | Security/release gate incomplete | Run dependency audit and generate lock-derived SBOM on network-enabled CI; review and remediate results. |
+| Monitored offline test | No firewall/network monitor available | Offline runtime intent is not independent evidence | Deny outbound traffic and run installed local tokenizer/model/SDK/CLI/API tests with traces. |
+| GPU/NCCL, performance, ONNX/quantization | CPU-only host and absent weights/runtime artifacts | No target performance or accelerator/export parity claims | Use target device and trained local artifact; run correctness parity first, then record hardware benchmarks. |
+| E-300-1 architecture selection | Only synthetic pilot run; no approved real corpus/compute | Production architecture remains an empirical decision | Run the documented equal-budget experiment on approved data and review uncertainty/limits before selecting. |
+| Legal/privacy/external security review | Requires authorized human reviewers and real source rights/PII context | No legal or production privacy/security certification | Obtain qualified review before real data use or external deployment. |
+
+No external gate was bypassed. Dataset acquisition, tokenizer training, model training, publishing, committing and pushing remain unperformed.

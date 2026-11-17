@@ -8,6 +8,7 @@ from typing import cast
 import torch
 from torch import nn
 from torch.nn import functional as F
+from torch.utils.checkpoint import checkpoint
 
 from orion_100m.config import Orion100MConfig
 from orion_100m.model.encoder import Orion100MEncoder
@@ -108,7 +109,16 @@ class SmallMLMGenerator(nn.Module):
         )
         self.final_norm = LayerNormNoBias(hidden_size)
         self.output_projection = nn.Linear(hidden_size, shared_embedding.embedding_dim, bias=False)
+        self.gradient_checkpointing = False
         self.reset_parameters()
+
+    def gradient_checkpointing_enable(self) -> None:
+        """Recompute generator blocks during training to reduce activation storage."""
+        self.gradient_checkpointing = True
+
+    def gradient_checkpointing_disable(self) -> None:
+        """Disable generator block recomputation."""
+        self.gradient_checkpointing = False
 
     def reset_parameters(self) -> None:
         for module in self.modules():
@@ -124,8 +134,15 @@ class SmallMLMGenerator(nn.Module):
             padding_idx=self.shared_embedding.padding_idx,
         )
         x = self.embedding_norm(self.input_projection(x))
-        for layer in self.layers:
-            x = layer(x, attention_mask)
+        for layer in cast(list[GeneratorBlock], list(self.layers)):
+            if self.gradient_checkpointing and self.training and torch.is_grad_enabled():
+
+                def run_block(value: torch.Tensor, block: GeneratorBlock = layer) -> torch.Tensor:
+                    return cast(torch.Tensor, block(value, attention_mask))
+
+                x = checkpoint(run_block, x, use_reentrant=False, preserve_rng_state=True)
+            else:
+                x = layer(x, attention_mask)
         return F.linear(self.output_projection(self.final_norm(x)), self.shared_embedding.weight)
 
 

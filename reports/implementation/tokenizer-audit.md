@@ -21,17 +21,16 @@ namespace under installed Tokenizers 0.22.2. The code now uses top-level
 The special-token digest is
 `733da01709c59745290542da2bed85df615873777d35167c61c35bb01f544190`.
 The source plan's original special-token table was damaged, so the checked-in
-registry remains provisional. `STATUS.json`, the recipe and approval record
-remain pending. CLI confirmation flags are local operator assertions and do
+map digest is approved for experimental research and recorded in `STATUS.json`,
+the recipe and approval record. CLI confirmation flags are local operator assertions and do
 not authenticate the owner.
 
-**Final v1 mapping freeze is blocked pending owner approval.** No production
+**Production v1 training remains blocked by corpus authorization and the untrained artifact gate.** No production
 corpus was downloaded and no final tokenizer was trained/exported.
 
 ## Next authorized workflow
 
-Review `docs/tokenizer/final_token_id_registry.md` and
-`docs/tokenizer/tokenizer_approval.md`, resolve the token map, record the same
-decision and digest in the recipe/status, then follow the exact commands in
+Preserve the approved token map and digest, obtain separately authorized
+corpus sources, then follow the exact commands in
 `docs/tokenizer/training.md`. Use only an explicitly approved local corpus.
 Before release, rerun `orion-tokenizer verify` and export to a new local path.

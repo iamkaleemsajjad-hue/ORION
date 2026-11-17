@@ -4,7 +4,7 @@
   "vocab_size": 32768,
   "trained_tokenizer_present": false,
   "training_corpus_downloaded": false,
-  "owner_approval": "pending",
+  "owner_approval": "approved",
   "special_token_map_sha256": "733da01709c59745290542da2bed85df615873777d35167c61c35bb01f544190",
-  "reason": "Production corpus authorization and the provisional special-token ID assignments require owner review before training."
+  "reason": "The current special-token map is approved for experimental research; production corpus authorization and tokenizer training remain pending."
 }

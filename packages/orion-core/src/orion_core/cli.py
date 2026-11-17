@@ -8,6 +8,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from orion_core.doctor import render_doctor_text, run_doctor
 from orion_core.preflight import run_preflight
 
 
@@ -15,6 +16,9 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the parser for the read-only ``orion preflight`` command."""
     parser = argparse.ArgumentParser(prog="orion")
     subparsers = parser.add_subparsers(dest="command", required=True)
+    doctor = subparsers.add_parser("doctor", help="inspect local software and hardware readiness")
+    doctor.add_argument("--root", type=Path, default=Path.cwd(), help="ORION checkout root")
+    doctor.add_argument("--format", choices=("json", "text"), default="json")
     preflight = subparsers.add_parser(
         "preflight", help="check software and optional training inputs"
     )
@@ -29,10 +33,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run preflight, printing JSON and returning 0 ready, 1 blocked, or 2 error."""
+    """Run read-only diagnostics and preflight checks."""
     args = build_parser().parse_args(argv)
-    if args.command != "preflight":
-        raise AssertionError("argparse accepted an unknown command")
+    if args.command == "doctor":
+        result = run_doctor(args.root)
+        if args.format == "text":
+            print(render_doctor_text(result))
+        else:
+            print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0 if result["status"] == "ready" else 1
     if args.model is None and any(
         value is not None for value in (args.dataset_dir, args.tokenizer_dir, args.precision)
     ):
